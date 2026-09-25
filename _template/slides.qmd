@@ -1,0 +1,43 @@
+---
+title: "Course title"
+subtitle: "Plain-words subtitle · Course NN"
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · NN · Topic"
+---
+
+## A situation you'll recognise {.center}
+
+> Start with a real e-mail, ticket or question from work.
+
+::: notes
+Ask the room. Come back to this at the end.
+:::
+
+# Part 1 · …
+
+## One idea per slide
+
+- Metaphor first (see `shared/metaphors.md`), then the real word
+- About one slide per minute of talking
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  A["Everyday thing"] --> B["Technical thing"]
+```
+
+::: notes
+Speaker notes go here. Press S in the browser for speaker view.
+:::
+
+## Recap
+
+1. …
+
+## Exercises
+
+…

@@ -1,0 +1,446 @@
+---
+title: "Locks, keys, seals & passports"
+subtitle: "Crypto basics for everyone · Course 01"
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 01 · Crypto basics"
+    code-copy: true
+---
+
+## An e-mail you will get one day {.center}
+
+> Hi! For the API connection, could you please send us **the certificate,
+> the key and the password**? Thanks!
+
+. . .
+
+Should you send it? What *should* you send? What must you **never** send?
+
+By the end of this session you'll know, and you'll be able to explain why.
+
+::: notes
+Ask for a show of hands: who would just send it? Don't give the answer yet;
+we come back to this e-mail at the very end.
+:::
+
+## Today
+
+1. **Secrets & fingerprints**: hashes and shared keys
+2. **Key pairs**: padlocks, wax seals and mixing paint
+3. **Trust**: certificates, who needs what, and red flags
+4. **Exercises**, pick your track:
+   - 🗣 **Explainers**: scenario cards, no terminal
+   - 🛠 **Builders**: `openssl` in the sandbox
+
+::: notes
+Explainers are people who don't configure this themselves, but have to explain
+to clients or third parties what is needed and why. Builders get their hands dirty.
+:::
+
+## Crypto does three jobs
+
+| Job | The question | Everyday version |
+|-----|--------------|------------------|
+| 🔒 **Confidentiality** | Can anyone else read this? | A sealed envelope |
+| 🧾 **Integrity** | Did anyone change this? | A tamper-evident seal |
+| 🪪 **Authenticity** | Who am I *really* talking to? | A passport check |
+
+. . .
+
+Most "certificate problems" at work are really **authenticity** questions.
+
+::: notes
+Keep coming back to these three words. Every tool today does one or more of these jobs.
+:::
+
+# Part 1 · Secrets & fingerprints
+
+## A hash is a fingerprint
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  A["I owe you 10 euro"] --> H1(("SHA-256")) --> FA["f681…84cb"]
+  B["I owe you 1000 euro"] --> H2(("SHA-256")) --> FB["a3f5…b3d1"]
+```
+
+- Same input → **always** the same fingerprint
+- Tiny change → a **completely different** fingerprint
+- There's **no way back** from the fingerprint to the document
+
+::: notes
+These are the real SHA-256 values; builders will reproduce them in exercise 1.
+A hash is not encryption: there's no key, and nothing to decrypt.
+Where you see them: download checksums, Git commits, certificate fingerprints,
+and inside every digital signature.
+:::
+
+## One shared key: symmetric crypto 🏠
+
+Like a **house key**: the same key locks and unlocks.
+
+- **Fast**: gigabytes per second. It does the heavy lifting in TLS, VPNs and disk encryption
+- **The catch**: how do you get a copy of the key to the other side
+  without anyone copying it on the way?
+
+::: notes
+This is the key distribution problem. Hold that thought: Part 2 solves it.
+:::
+
+## Not all locks are equal
+
+| Use today ✅ | Retired 🪦 |
+|-------------|-----------|
+| **AES-GCM** | DES, **3DES**: retired by NIST end of 2023 |
+| **ChaCha20-Poly1305** | RC4: banned from TLS since 2015 |
+| | AES-CBC without an integrity check: removed from TLS 1.3 |
+
+. . .
+
+GCM and Poly1305 are **AEAD**: a **tamper-evident envelope**.
+Change one bit, and the recipient refuses the whole message.
+
+::: notes
+3DES has 64-bit blocks, which makes it vulnerable to the Sweet32 attack (2016).
+ChaCha20 is fast on phones without AES hardware.
+Builders will see in exercise 2 how an attacker changes "100 euro" into
+"900 euro" in AES-CBC *without knowing the key*, and how AES-GCM refuses it.
+:::
+
+# Part 2 · Key pairs
+
+## The padlock trick 🔓
+
+Imagine you could hand out **open padlocks** for free.
+
+- Anyone can snap one shut on a box and post it to you
+- Only **you** have the key that opens them
+
+. . .
+
+That's public-key crypto:
+
+- 🔓 **public key** = the open padlock → hand out as many as you like
+- 🔑 **private key** = the only key that opens it → never leaves you
+
+::: notes
+The two keys are created together as a pair and are mathematically linked.
+You can't work out the private key from the public key. That's the whole trick.
+:::
+
+## The golden rule {.center}
+
+::: golden
+**The private key stays home. The public key travels.**
+:::
+
+Anyone who has your private key *is you*, as far as computers are concerned.
+
+::: notes
+Say it twice. Everything in Part 3, and every red flag, follows from this one rule.
+:::
+
+## One key pair, two tricks
+
+| | Encrypt 📦 | Sign ✍️ |
+|---|---|---|
+| **Goal** | Only the recipient can read it | Everyone can check it's from you, unchanged |
+| **Done with** | the **recipient's public** key | **your private** key |
+| **Opened / checked with** | the recipient's private key | **your public** key |
+| **Everyday version** | the padlock | a wax seal only you own |
+
+::: notes
+A common mix-up: "I sign with the other party's key". No: you sign with your
+own private key, and anyone can check it with your public key.
+In practice, public-key encryption only protects a small symmetric key, and
+the symmetric key does the bulk work (hybrid encryption).
+:::
+
+## Signing, step by step
+
+```{mermaid}
+sequenceDiagram
+  participant A as Alice (private key)
+  participant B as Bob (Alice's public key)
+  A->>A: fingerprint the contract (hash)
+  A->>A: sign the fingerprint with her private key
+  A->>B: contract + signature
+  B->>B: fingerprint the contract himself
+  B->>B: check the signature with Alice's public key
+  Note over B: ✅ match: from Alice, unchanged<br/>❌ no match: changed, or not Alice
+```
+
+::: notes
+A signature gives integrity and authenticity. It does NOT hide the content:
+the contract travels in the clear.
+"Only Alice could have made this" only holds if only Alice ever had the private
+key. That's why it matters *who generates* a key pair (Part 3).
+:::
+
+## Agreeing on a secret in public: mixing paint 🎨
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  Y["🟡 common colour<br/>(public)"] --> AM & BM
+  AS["🔴 Alice's secret"] --> AM["🟠 Alice's mix"]
+  BS["🔵 Bob's secret"] --> BM["🟢 Bob's mix"]
+  AM -- "sent in public" --> BF["🟤 Bob adds 🔵"]
+  BM -- "sent in public" --> AF["🟤 Alice adds 🔴"]
+```
+
+Both end up with the same brown; an eavesdropper only sees 🟡 🟠 🟢 and can't un-mix paint.
+
+::: notes
+This is (EC)Diffie–Hellman, and it solves Part 1's "how do we share the house key?"
+TLS does it for every connection, then switches to fast AES-GCM or ChaCha20.
+"Ephemeral" (the E in ECDHE) means fresh paint for every connection. That gives
+forward secrecy: stealing the server's key tomorrow does not unlock today's traffic.
+:::
+
+## RSA or elliptic curves?
+
+| Algorithm | For ~128-bit security | Public key size | Notes |
+|-----------|----------------------|-----------------|-------|
+| **RSA** | 3072-bit key | 422 bytes | The veteran; encrypts *and* signs |
+| **EC P-256** | 256-bit key | 91 bytes | Smaller and faster; ECDSA / ECDH |
+| **Ed25519** | 256-bit key | 44 bytes | Modern signatures, hard to misuse |
+: {tbl-colwidths="[16,26,22,36]"}
+
+::: small
+RSA-2048 is still everywhere (about 112-bit) and fine for now. **Coming up:
+post-quantum** crypto. ML-KEM is already mixed into the TLS your browser uses today.
+:::
+
+::: notes
+The sizes are the DER-encoded public keys builders will measure in exercise 3.
+You don't need to remember numbers; remember "EC gives the same strength with
+much smaller keys".
+:::
+
+# Part 3 · Trust
+
+## But… whose padlock is it? 🤔
+
+```{mermaid}
+sequenceDiagram
+  participant A as Alice
+  participant M as Mallory
+  participant B as Bob
+  A->>M: Bob, please send me your padlock
+  M->>B: Bob, please send me your padlock
+  B->>M: 🔓 Bob's padlock
+  M->>A: 🔓 Mallory's padlock, "from Bob"
+  Note over A: Alice locks her secret with Mallory's padlock 😱
+```
+
+Public keys are safe to share, **but you must know whose key it is**.
+
+::: notes
+The man in the middle. Encryption without authentication gives you a very
+secure line to whoever answered the phone.
+:::
+
+## A certificate is a passport for a public key 🪪
+
+- **Who**: a name: `shop.example`, or `Acme BV – API client`
+- **What**: their **public key**
+- **Allowed for**: **ServerAuth**? **ClientAuth**? (the Extended Key Usage)
+- **Valid**: from … until …
+- **Stamped by**: a notary, the **Certificate Authority (CA)**, who signed all of the above
+
+. . .
+
+No secrets inside → **a certificate is safe to share with anyone**.
+
+::: notes
+This is where the words ServerAuth and ClientAuth come from: they are fields
+in the certificate saying what it may be used for.
+A certificate alone proves nothing. In TLS the server also proves it holds the
+matching private key by signing something fresh during the handshake.
+:::
+
+## The chain of trust
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  R["🏛 Root CA<br/>pre-installed or configured"] -- signs --> I["🏢 Intermediate CA"] -- signs --> L["🪪 shop.example"]
+```
+
+- You trust the **root**; the root vouches for the **intermediate**; the intermediate vouches for the **server**
+- The server sends **its certificate + the intermediate(s)**
+- The verifier must **already have the root** in its *trust store*
+
+::: notes
+Browsers and operating systems ship with roughly 150 public root CAs.
+A *private CA* is your own notary's office: only systems that have had its
+root certificate installed will trust it. Keep this in mind for the
+"who needs what" slides.
+:::
+
+## Getting a passport: the CSR 📝
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  subgraph Owner["Owner of the key"]
+    K["🔑 generate key pair"] --> C["📝 CSR<br/>public key + name"]
+  end
+  C -- "e-mail, portal: safe ✅" --> CA["🏛 CA checks & signs"]
+  CA -- "certificate: safe ✅" --> Owner
+```
+
+The **private key never leaves its owner**, not even to go to the CA.
+
+::: notes
+CSR = Certificate Signing Request, the passport application form.
+It contains the public key and the name, signed with the private key to prove
+the applicant has it. It does not contain the private key.
+:::
+
+## Who needs what: ServerAuth 🌐
+
+*"The clients check they're really talking to **our** server."*
+
+| | Server owner (us) | Clients / third party |
+|---|:---:|:---:|
+| Generates the key pair | ✅ | |
+| Keeps the private key | ✅ never shared | |
+| Sends a CSR to the CA, installs certificate + intermediates | ✅ | |
+| Needs the CA's root certificate | | ✅ built in for a **public** CA<br/>**must be given it** for a **private** CA |
+: {tbl-colwidths="[44,26,30]"}
+
+::: notes
+The usual support ticket: "your certificate is not trusted". With a public CA
+that almost always means the server forgot to send the intermediate. With a
+private CA the client doesn't have our root yet: send them the root CA
+certificate, which is safe to share.
+:::
+
+## Who needs what: ClientAuth (mutual TLS) 🤝
+
+*"Our server checks that it's really **Acme** calling."*
+
+| | Acme (the client) | Us (the server checking) |
+|---|:---:|:---:|
+| Generates the key pair | ✅ on their own system | ❌ never for them |
+| Keeps the private key | ✅ | |
+| Gets a client certificate from | a CA we agreed on | |
+| Needs the **issuing CA certificate(s)** | | ✅ as trust anchor |
+| May also check | | the certificate's name or fingerprint |
+: {tbl-colwidths="[38,30,32]"}
+
+::: small
+⚠️ Since **June 2026**, public CAs no longer issue certificates for ClientAuth.
+Client certificates now come from a **private CA** (ours, Acme's, or a provider's).
+:::
+
+::: notes
+Two common models:
+(1) We run a private CA. Acme sends us a CSR, we sign it and send back the
+certificate. We already trust our own CA.
+(2) Acme has its own CA. They send us their CA certificate chain, and we trust
+that CA, ideally only for Acme's specific name.
+Either way, Acme generates and keeps the private key. If we generated it for
+them, we could impersonate them, and "only Acme could have done this" no longer
+holds.
+The June 2026 change comes from the Chrome root program. "Just buy one at a
+public CA" no longer works for mTLS.
+:::
+
+## Is this file safe to e-mail?
+
+| File | Contains | Share? |
+|------|----------|:------:|
+| `.csr` | public key + name | 🟢 yes |
+| `.crt` `.cer` | certificate | 🟢 yes |
+| `ca.crt`, `chain.pem`, `ca-bundle` | CA certificates | 🟢 yes |
+| `.key` | **private key** | 🔴 **never** |
+| `.p12` `.pfx` | certificate **+ private key** | 🔴 **never** to another party |
+| `.jks` | Java keystore, often with keys | 🔴 unless it's only CA certs |
+| `.pem` `.der` | could be anything | 👀 look inside |
+
+**Inside a `.pem`:** `BEGIN CERTIFICATE` 🟢 · `BEGIN CERTIFICATE REQUEST` 🟢 · `BEGIN … PRIVATE KEY` 🔴
+
+::: notes
+PEM is text (base64 between BEGIN/END lines); DER is the same bytes in binary.
+File extensions are conventions, not guarantees, so open the file and look.
+A password on a .p12 doesn't make it safe to e-mail: the password usually
+arrives in the next e-mail.
+:::
+
+## Red flags 🚩
+
+- *"Send us the private key / the .pfx and the password"*
+- *"We'll generate the key pair for you and e-mail it"*
+- *"Just turn off certificate verification for now"*
+- *"It's self-signed, just click accept"*
+- *"We use the same certificate and key for all our customers"*
+
+Each one **breaks the golden rule** or **skips the "whose padlock?" check**.
+
+::: notes
+When is moving a .pfx OK? Inside one owner's own environment: you move your own
+server certificate onto your own load balancer, over a secure channel. The
+owner doesn't change. It's never OK when the key would go to another party.
+:::
+
+## Back to that e-mail
+
+> …could you please send us **the certificate, the key and the password**?
+
+. . .
+
+> *"We're happy to send our **certificate and the CA chain**. The private key
+> stays with us, so nobody else can pose as us. If you need to authenticate
+> us as a client, tell us which **CA** you accept and we'll send you a **CSR**."*
+
+::: notes
+Ask the room what changed compared to the start. This template reply is also on the handout.
+:::
+
+## Recap
+
+1. Crypto does three jobs: **secret**, **untampered**, **who**
+2. Symmetric = one shared key, fast. Use **AES-GCM** or **ChaCha20-Poly1305**
+3. **The private key stays home. The public key travels.**
+4. Encrypt with *their* public key; sign with *your* private key
+5. A **certificate** = public key + name, signed by a **CA**. Safe to share
+6. The **owner** generates and keeps the key; the **verifier** needs the CA certificate
+
+## Exercises: pick your track (≈ 17 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Explainers
+
+No terminal needed. In pairs:
+
+**Scenario cards: who sends what?**
+
+`exercises/tabletop-who-sends-what.md`
+:::
+::: {.column width="50%"}
+### 🛠 Builders
+
+In the sandbox:
+
+1. Fingerprints
+2. One shared key
+3. Key pairs, PEM & DER
+4. Sign & verify
+5. *Bonus: be your own CA*
+:::
+::::
+
+## Debrief {.center}
+
+One scenario card, everyone together.
+
+**Next up: 02 · TLS & PKI in practice**: handshakes, chains, mTLS, expiry & rotation.
+
+Questions? 🙋

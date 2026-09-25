@@ -1,0 +1,458 @@
+---
+title: "Sloten, sleutels, zegels & paspoorten"
+subtitle: "Crypto-basis voor iedereen · Cursus 01"
+lang: nl
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 01 · Crypto-basis"
+    code-copy: true
+---
+
+## Een mail die je ooit gaat krijgen {.center}
+
+> Hoi! Voor de API-koppeling: kun je ons **het certificaat, de key en het
+> wachtwoord** sturen? Dank je!
+
+. . .
+
+Moet je dat sturen? Wat stuur je *wel*? Wat stuur je **nooit**?
+
+Aan het eind van deze sessie weet je het, en kun je ook uitleggen waarom.
+
+::: notes
+Vraag om handen: wie zou het gewoon sturen? Geef het antwoord nog niet;
+we komen helemaal aan het eind terug op deze mail.
+:::
+
+## Vandaag
+
+1. **Geheimen & vingerafdrukken**: hashes en gedeelde sleutels
+2. **Sleutelparen**: hangsloten, lakzegels en verf mengen
+3. **Vertrouwen**: certificaten, wie heeft wat nodig, en rode vlaggen
+4. **Opdrachten**, kies je track:
+   - 🗣 **Uitleggers**: scenariokaarten, geen terminal
+   - 🛠 **Bouwers**: `openssl` in de sandbox
+
+::: notes
+Uitleggers zijn mensen die dit niet zelf inrichten, maar wel aan klanten of
+derde partijen moeten uitleggen wat er nodig is en waarom. Bouwers gaan er
+zelf mee aan de slag.
+:::
+
+## Crypto doet drie dingen
+
+| Taak | De vraag | In het dagelijks leven |
+|------|----------|------------------------|
+| 🔒 **Vertrouwelijkheid** | Kan iemand anders dit lezen? | Een dichtgeplakte envelop |
+| 🧾 **Integriteit** | Heeft iemand dit veranderd? | Een verzegeling: je ziet het als ermee geknoeid is |
+| 🪪 **Authenticiteit** | Met wie praat ik *echt*? | Een paspoortcontrole |
+
+. . .
+
+De meeste "certificaatproblemen" op het werk zijn eigenlijk **authenticiteits**vragen.
+
+::: notes
+Kom steeds terug op deze drie woorden. Elk hulpmiddel van vandaag doet één of
+meer van deze taken.
+:::
+
+# Deel 1 · Geheimen & vingerafdrukken
+
+## Een hash is een vingerafdruk
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  A["I owe you 10 euro"] --> H1(("SHA-256")) --> FA["f681…84cb"]
+  B["I owe you 1000 euro"] --> H2(("SHA-256")) --> FB["a3f5…b3d1"]
+```
+
+- Zelfde invoer → **altijd** dezelfde vingerafdruk
+- Klein verschil → een **totaal andere** vingerafdruk
+- Je kunt **niet terug** van vingerafdruk naar document
+
+::: notes
+Dit zijn de echte SHA-256-waarden; de bouwers zien ze terug in opdracht 1
+(die tekst blijft Engels, net als in de opdracht).
+Een hash is geen versleuteling: er is geen sleutel en niets om te ontsleutelen.
+Waar je ze tegenkomt: checksums bij downloads, Git-commits,
+certificaat-fingerprints, en in elke digitale handtekening.
+:::
+
+## Eén gedeelde sleutel: symmetrische crypto 🏠
+
+Net als een **huissleutel**: dezelfde sleutel doet op slot en van het slot.
+
+- **Snel**: gigabytes per seconde. Doet het zware werk in TLS, VPN's en schijfversleuteling
+- **Het probleem**: hoe krijg je een kopie van de sleutel bij de ander,
+  zonder dat iemand onderweg een kopie maakt?
+
+::: notes
+Dit is het sleuteldistributieprobleem. Onthoud het even: deel 2 lost het op.
+:::
+
+## Niet elk slot is even goed
+
+| Gebruik nu ✅ | Met pensioen 🪦 |
+|--------------|----------------|
+| **AES-GCM** | DES, **3DES**: door NIST afgeschreven eind 2023 |
+| **ChaCha20-Poly1305** | RC4: sinds 2015 verboden in TLS |
+| | AES-CBC zonder integriteitscontrole: geschrapt in TLS 1.3 |
+
+. . .
+
+GCM en Poly1305 zijn **AEAD**: een **verzegelde envelop**.
+Verander één bit, en de ontvanger weigert het hele bericht.
+
+::: notes
+3DES heeft blokken van 64 bits en is daardoor kwetsbaar voor de Sweet32-aanval (2016).
+ChaCha20 is snel op telefoons zonder AES-hardware.
+De bouwers zien in opdracht 2 hoe een aanvaller bij AES-CBC "100 euro" in
+"900 euro" verandert *zonder de sleutel te kennen*, en hoe AES-GCM dat weigert.
+:::
+
+# Deel 2 · Sleutelparen
+
+## De hangslot-truc 🔓
+
+Stel dat je gratis **open hangsloten** kunt uitdelen.
+
+- Iedereen kan er een dichtklikken op een doos en die naar jou opsturen
+- Alleen **jij** hebt de sleutel die ze openmaakt
+
+. . .
+
+Dat is public-key crypto:
+
+- 🔓 **public key** = het open hangslot → deel er zoveel uit als je wilt
+- 🔑 **private key** = de enige sleutel die het opent → gaat nooit de deur uit
+
+::: notes
+De twee sleutels worden samen gemaakt als sleutelpaar (key pair) en hangen
+wiskundig met elkaar samen. Uit de public key kun je de private key niet
+afleiden. Dat is de hele truc.
+:::
+
+## De gouden regel {.center}
+
+::: golden
+**De private key blijft thuis. De public key reist.**
+:::
+
+Wie jouw private key heeft, *is jou* voor een computer.
+
+::: notes
+Zeg het twee keer. Alles in deel 3, en elke rode vlag, volgt uit deze ene regel.
+:::
+
+## Eén sleutelpaar, twee trucs
+
+| | Versleutelen 📦 | Ondertekenen ✍️ |
+|---|---|---|
+| **Doel** | Alleen de ontvanger kan het lezen | Iedereen kan controleren dat het van jou komt, onveranderd |
+| **Gedaan met** | de **public key van de ontvanger** | **jouw private key** |
+| **Geopend / gecontroleerd met** | de private key van de ontvanger | **jouw public key** |
+| **In het dagelijks leven** | het hangslot | een lakzegel dat alleen jij hebt |
+
+::: notes
+Veelgemaakte fout: "ik onderteken met de sleutel van de ander". Nee: je
+ondertekent met je eigen private key, en iedereen kan het controleren met je
+public key.
+In de praktijk beschermt public-key versleuteling alleen een kleine
+symmetrische sleutel, en die doet het zware werk (hybride versleuteling).
+:::
+
+## Ondertekenen, stap voor stap
+
+```{mermaid}
+sequenceDiagram
+  participant A as Alice (private key)
+  participant B as Bob (public key van Alice)
+  A->>A: maakt een vingerafdruk (hash) van het contract
+  A->>A: ondertekent de vingerafdruk met haar private key
+  A->>B: contract + handtekening
+  B->>B: maakt zelf een vingerafdruk van het contract
+  B->>B: controleert de handtekening met de public key van Alice
+  Note over B: ✅ klopt: van Alice, onveranderd<br/>❌ klopt niet: veranderd, of niet van Alice
+```
+
+::: notes
+Een handtekening geeft integriteit en authenticiteit. Hij verbergt de inhoud
+NIET: het contract reist gewoon leesbaar mee.
+"Alleen Alice kan dit gemaakt hebben" geldt alleen als alleen Alice ooit de
+private key had. Daarom is het belangrijk *wie een sleutelpaar maakt* (deel 3).
+:::
+
+## In het openbaar een geheim afspreken: verf mengen 🎨
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  Y["🟡 gezamenlijke kleur<br/>(openbaar)"] --> AM & BM
+  AS["🔴 geheim van Alice"] --> AM["🟠 mengsel van Alice"]
+  BS["🔵 geheim van Bob"] --> BM["🟢 mengsel van Bob"]
+  AM -- "openbaar verstuurd" --> BF["🟤 Bob voegt 🔵 toe"]
+  BM -- "openbaar verstuurd" --> AF["🟤 Alice voegt 🔴 toe"]
+```
+
+Allebei houden ze hetzelfde bruin over. Een afluisteraar ziet alleen 🟡 🟠 🟢 en kan verf niet ontmengen.
+
+::: notes
+Dit is (EC)Diffie–Hellman, en het lost het "hoe delen we de huissleutel?" van
+deel 1 op. TLS doet dit bij elke verbinding en schakelt dan over op snelle
+AES-GCM of ChaCha20.
+"Ephemeral" (de E in ECDHE) betekent verse verf bij elke verbinding. Dat geeft
+forward secrecy: wie morgen de sleutel van de server steelt, kan het verkeer
+van vandaag niet alsnog lezen.
+:::
+
+## RSA of elliptische krommen?
+
+| Algoritme | Voor ~128-bit veiligheid | Grootte public key | Opmerkingen |
+|-----------|--------------------------|--------------------|-------------|
+| **RSA** | sleutel van 3072 bits | 422 bytes | De veteraan; versleutelt *en* ondertekent |
+| **EC P-256** | sleutel van 256 bits | 91 bytes | Kleiner en sneller; ECDSA / ECDH |
+| **Ed25519** | sleutel van 256 bits | 44 bytes | Moderne handtekeningen, moeilijk verkeerd te gebruiken |
+: {tbl-colwidths="[16,26,22,36]"}
+
+::: small
+RSA-2048 is nog overal (zo'n 112 bits) en voorlopig prima. **Wat eraan komt:
+post-quantum** crypto. ML-KEM zit nu al in de TLS die je browser gebruikt.
+:::
+
+::: notes
+De groottes zijn de DER-gecodeerde public keys die de bouwers meten in opdracht 3.
+Je hoeft geen getallen te onthouden; onthoud "EC geeft dezelfde sterkte met
+veel kleinere sleutels".
+:::
+
+# Deel 3 · Vertrouwen
+
+## Maar… van wie is dat hangslot? 🤔
+
+```{mermaid}
+sequenceDiagram
+  participant A as Alice
+  participant M as Mallory
+  participant B as Bob
+  A->>M: Bob, stuur me je hangslot
+  M->>B: Bob, stuur me je hangslot
+  B->>M: 🔓 hangslot van Bob
+  M->>A: 🔓 hangslot van Mallory, "van Bob"
+  Note over A: Alice doet haar geheim op het slot van Mallory 😱
+```
+
+Public keys mag je delen, **maar je moet weten van wie de sleutel is**.
+
+::: notes
+De man-in-the-middle. Versleuteling zonder authenticatie geeft je een heel
+veilige lijn met degene die toevallig opnam.
+:::
+
+## Een certificaat is een paspoort voor een public key 🪪
+
+- **Wie**: een naam: `shop.example`, of `Acme BV – API client`
+- **Wat**: hun **public key**
+- **Mag gebruikt worden voor**: **ServerAuth**? **ClientAuth**? (de Extended Key Usage)
+- **Geldig**: van … tot …
+- **Afgestempeld door**: een notaris, de **Certificate Authority (CA)**, die alles hierboven heeft ondertekend
+
+. . .
+
+Geen geheimen erin → **een certificaat mag je met iedereen delen**.
+
+::: notes
+Hier komen de woorden ServerAuth en ClientAuth vandaan: het zijn velden in het
+certificaat die zeggen waarvoor het gebruikt mag worden.
+Een certificaat alleen bewijst niets. In TLS bewijst de server ook dat hij de
+bijbehorende private key heeft, door tijdens de handshake iets nieuws te
+ondertekenen.
+:::
+
+## De vertrouwensketen
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  R["🏛 Root CA<br/>voorgeïnstalleerd of ingesteld"] -- ondertekent --> I["🏢 Intermediate CA"] -- ondertekent --> L["🪪 shop.example"]
+```
+
+- Je vertrouwt de **root**; de root staat in voor de **intermediate**; de intermediate staat in voor de **server**
+- De server stuurt **zijn certificaat + de intermediate(s)** mee
+- Wie controleert, moet de **root al hebben** in zijn *trust store*
+
+::: notes
+Browsers en besturingssystemen komen met zo'n 150 publieke root-CA's.
+Een *private CA* is je eigen notariskantoor: alleen systemen waarop het
+root-certificaat is geïnstalleerd vertrouwen het. Houd dat vast voor de
+"wie heeft wat nodig"-slides.
+:::
+
+## Een paspoort aanvragen: de CSR 📝
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  subgraph Owner["Eigenaar van de sleutel"]
+    K["🔑 maakt sleutelpaar"] --> C["📝 CSR<br/>public key + naam"]
+  end
+  C -- "mail, portal: veilig ✅" --> CA["🏛 CA controleert & ondertekent"]
+  CA -- "certificaat: veilig ✅" --> Owner
+```
+
+De **private key verlaat nooit zijn eigenaar**, ook niet richting de CA.
+
+::: notes
+CSR = Certificate Signing Request, het aanvraagformulier voor een paspoort.
+Er staan de public key en de naam in, ondertekend met de private key om te
+bewijzen dat de aanvrager die heeft. De private key zit er niet in.
+:::
+
+## Wie heeft wat nodig: ServerAuth 🌐
+
+*"De clients controleren dat ze echt met **onze** server praten."*
+
+| | Servereigenaar (wij) | Clients / derde partij |
+|---|:---:|:---:|
+| Maakt het sleutelpaar | ✅ | |
+| Bewaart de private key | ✅ nooit gedeeld | |
+| Stuurt een CSR naar de CA, installeert certificaat + intermediates | ✅ | |
+| Heeft het root-certificaat van de CA nodig | | ✅ zit er al in bij een **publieke** CA<br/>**moet je ze geven** bij een **private** CA |
+: {tbl-colwidths="[44,26,30]"}
+
+::: notes
+Het bekende supportticket: "jullie certificaat wordt niet vertrouwd". Bij een
+publieke CA betekent dat bijna altijd dat de server de intermediate niet
+meestuurt. Bij een private CA heeft de client onze root nog niet: stuur ze het
+root-CA-certificaat, dat is veilig om te delen.
+:::
+
+## Wie heeft wat nodig: ClientAuth (mutual TLS) 🤝
+
+*"Onze server controleert dat het echt **Acme** is die belt."*
+
+| | Acme (de client) | Wij (de server die controleert) |
+|---|:---:|:---:|
+| Maakt het sleutelpaar | ✅ op eigen systemen | ❌ nooit voor hen |
+| Bewaart de private key | ✅ | |
+| Krijgt een clientcertificaat van | een CA waarover we afspraken maken | |
+| Heeft de **uitgevende CA-certificaten** nodig | | ✅ als trust anchor |
+| Kan ook controleren | | de naam of fingerprint van het certificaat |
+: {tbl-colwidths="[38,30,32]"}
+
+::: small
+⚠️ Sinds **juni 2026** geven publieke CA's geen certificaten voor ClientAuth meer uit.
+Clientcertificaten komen nu van een **private CA** (van ons, van Acme of van een aanbieder).
+:::
+
+::: notes
+Twee gangbare modellen:
+(1) Wij hebben een private CA. Acme stuurt ons een CSR, wij ondertekenen en
+sturen het certificaat terug. Onze eigen CA vertrouwen we al.
+(2) Acme heeft een eigen CA. Ze sturen ons hun CA-certificaatketen, en wij
+vertrouwen die CA, liefst alleen voor Acme's eigen naam.
+Hoe dan ook: Acme maakt en bewaart de private key. Als wij die voor ze
+maakten, konden wij ons als Acme voordoen, en "alleen Acme kan dit gedaan
+hebben" gaat dan niet meer op.
+De wijziging van juni 2026 komt uit het root-programma van Chrome. "Koop er
+gewoon een bij een publieke CA" werkt dus niet meer voor mTLS.
+:::
+
+## Mag dit bestand per mail?
+
+| Bestand | Bevat | Delen? |
+|---------|-------|:------:|
+| `.csr` | public key + naam | 🟢 ja |
+| `.crt` `.cer` | certificaat | 🟢 ja |
+| `ca.crt`, `chain.pem`, `ca-bundle` | CA-certificaten | 🟢 ja |
+| `.key` | **private key** | 🔴 **nooit** |
+| `.p12` `.pfx` | certificaat **+ private key** | 🔴 **nooit** naar een andere partij |
+| `.jks` | Java-keystore, vaak met keys | 🔴 tenzij er alleen CA-certificaten in zitten |
+| `.pem` `.der` | kan van alles zijn | 👀 kijk erin |
+
+**In een `.pem`:** `BEGIN CERTIFICATE` 🟢 · `BEGIN CERTIFICATE REQUEST` 🟢 · `BEGIN … PRIVATE KEY` 🔴
+
+::: notes
+PEM is tekst (base64 tussen BEGIN- en END-regels); DER is dezelfde inhoud
+binair. Bestandsextensies zijn afspraken, geen garanties, dus open het bestand
+en kijk. Een wachtwoord op een .p12 maakt hem niet veilig om te mailen: het
+wachtwoord komt meestal in de volgende mail.
+:::
+
+## Rode vlaggen 🚩
+
+- *"Stuur ons de private key / de .pfx en het wachtwoord"*
+- *"Wij maken het sleutelpaar wel voor je en mailen het"*
+- *"Zet de certificaatcontrole voorlopig even uit"*
+- *"Het is self-signed, klik gewoon op accepteren"*
+- *"We gebruiken hetzelfde certificaat en dezelfde key voor al onze klanten"*
+
+Elk ervan **breekt de gouden regel** of **slaat de "van wie is dit hangslot?"-check over**.
+
+::: notes
+Wanneer is een .pfx verplaatsen wel oké? Binnen de eigen omgeving van één
+eigenaar: je zet je eigen servercertificaat op je eigen loadbalancer, via een
+veilig kanaal. De eigenaar verandert niet. Het is nooit oké als de key naar
+een andere partij gaat.
+:::
+
+## Terug naar die mail
+
+> …kun je ons **het certificaat, de key en het wachtwoord** sturen?
+
+. . .
+
+> *"We sturen je graag ons **certificaat en de CA-keten**. De private key
+> houden we zelf, zodat niemand anders zich als ons kan voordoen. Moeten jullie
+> ons als client authenticeren? Laat dan weten welke **CA** jullie accepteren,
+> dan sturen we een **CSR**."*
+
+::: notes
+Vraag de zaal wat er veranderd is ten opzichte van het begin. Deze
+voorbeeldreactie staat ook op de hand-out.
+:::
+
+## Samengevat
+
+1. Crypto doet drie dingen: **geheim**, **onveranderd**, **wie**
+2. Symmetrisch = één gedeelde sleutel, snel. Gebruik **AES-GCM** of **ChaCha20-Poly1305**
+3. **De private key blijft thuis. De public key reist.**
+4. Versleutel met *hun* public key; onderteken met *jouw* private key
+5. Een **certificaat** = public key + naam, ondertekend door een **CA**. Mag je delen
+6. De **eigenaar** maakt en bewaart de key; **wie controleert** heeft het CA-certificaat nodig
+
+## Opdrachten: kies je track (≈ 17 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Uitleggers
+
+Geen terminal nodig. In tweetallen:
+
+**Scenariokaarten: wie stuurt wat?**
+
+`exercises/tabletop-who-sends-what.nl.md`
+:::
+::: {.column width="50%"}
+### 🛠 Bouwers
+
+In de sandbox:
+
+1. Vingerafdrukken
+2. Eén gedeelde sleutel
+3. Sleutelparen, PEM & DER
+4. Ondertekenen & controleren
+5. *Bonus: wees je eigen CA*
+:::
+::::
+
+## Nabespreking {.center}
+
+Eén scenariokaart, met z'n allen.
+
+**Volgende keer: 02 · TLS & PKI in de praktijk**: handshakes, ketens, mTLS, verlopen & vernieuwen.
+
+Vragen? 🙋

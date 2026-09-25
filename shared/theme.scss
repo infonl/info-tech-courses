@@ -1,0 +1,57 @@
+/*-- scss:defaults --*/
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono&display=swap");
+
+$font-family-sans-serif: "Inter", "Helvetica Neue", Arial, sans-serif;
+$font-family-monospace: "JetBrains Mono", Consolas, monospace;
+$presentation-font-size-root: 34px;
+$presentation-heading-font-weight: 800;
+$presentation-heading-color: #1f2a44;
+$body-color: #1f2a44;
+$link-color: #0b6e99;
+$code-block-font-size: 0.6em;
+
+// Mermaid diagrams. Use a system font: Mermaid sizes its boxes before web fonts
+// such as Inter have loaded, so a web font here makes labels overflow.
+$mermaid-font-family: Arial, Helvetica, sans-serif;
+$mermaid-label-fg-color: #1f2a44;
+$mermaid-node-fg-color: #1f2a44;
+$mermaid-node-bg-color: #eef2f7;
+$mermaid-edge-color: #6b7280;
+$mermaid-label-bg-color: #ffffff;
+$mermaid-fg-color--lighter: #9ca3af;
+$mermaid-fg-color--lightest: #f8f9fb;
+
+/*-- scss:rules --*/
+
+// "The golden rule" and other key messages
+.golden {
+  border-left: 8px solid #e8590c;
+  background: #fff4e6;
+  padding: 0.6em 1em;
+  border-radius: 6px;
+  font-size: 1.1em;
+}
+
+.small { font-size: 0.7em; }
+.muted { color: #6b7280; }
+.safe { color: #2b8a3e; font-weight: 600; }
+.danger { color: #c92a2a; font-weight: 600; }
+
+.reveal table { font-size: 0.72em; }
+.reveal table th { background: #eef2f7; }
+.reveal blockquote {
+  width: 90%;
+  font-style: normal;
+  background: #f8f9fb;
+  border-left: 6px solid #0b6e99;
+  box-shadow: none;
+}
+
+// Section title slides
+.reveal .slide-background.quarto-title-block,
+.reveal section.title-slide h1 { color: #1f2a44; }
+
+.reveal .mermaid-js svg { max-height: 540px; }
+
+// Edge labels get a solid background, so the arrow doesn't strike through them
+.reveal .mermaid-js .edgeLabel rect.background { fill: #ffffff !important; opacity: 1 !important; }

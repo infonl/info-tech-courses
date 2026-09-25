@@ -1,0 +1,20 @@
+{
+  "name": "Info Tech Courses sandbox",
+  "build": {
+    "dockerfile": "../sandbox/Dockerfile",
+    "context": "../sandbox"
+  },
+  "remoteUser": "student",
+  "remoteEnv": {
+    "COURSES": "${containerWorkspaceFolder}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "quarto.quarto",
+        "bierner.markdown-mermaid",
+        "ms-python.python"
+      ]
+    }
+  }
+}

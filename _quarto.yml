@@ -1,0 +1,34 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - joining.md
+    - joining.nl.md
+    - "courses/**/*.qmd"
+    - "courses/**/*.md"
+
+website:
+  title: "Info Tech Crash Courses"
+  navbar:
+    left:
+      - href: index.qmd
+        text: "Courses"
+      - href: joining.md
+        text: "Joining a course"
+      - href: joining.nl.md
+        text: "Meedoen"
+  page-footer:
+    center: "Internal crash courses · written in Markdown, rendered with Quarto"
+
+# Quarto never renders README.md files. Each course has an index.qmd that
+# includes its README, and this filter points README.md links at index.html.
+filters:
+  - shared/readme-links.lua
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-copy: true
+

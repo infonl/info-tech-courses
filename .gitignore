@@ -1,0 +1,25 @@
+# Quarto output
+/_site/
+/.quarto/
+*_files/
+*.html
+
+# Crypto material never belongs in git; exercises generate it in ~/lab
+*.key
+*.p12
+*.pfx
+*.jks
+*.csr
+*.srl
+lab/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+**/*.quarto_ipynb

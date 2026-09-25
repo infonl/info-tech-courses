@@ -1,0 +1,20 @@
+---
+title: "Info Tech Crash Courses"
+subtitle: "Short courses on the things that seem hard until someone explains the basics"
+toc: false
+---
+
+Every course takes 30–50 minutes and has slides, a one-page handout and
+exercises. Explainers get tabletop scenarios; builders get a terminal.
+Most courses come in English 🇬🇧 and Dutch 🇳🇱.
+
+**New here?** Read [Joining a course](joining.md) · [Meedoen aan een cursus](joining.nl.md):
+what to bring, and how to get the exercise sandbox ready in 10 minutes.
+
+| # | Course | 🇬🇧 English | 🇳🇱 Nederlands |
+|---|--------|------------|---------------|
+| 01 | **Crypto basics**: locks, keys, seals & passports | [Slides](courses/01-crypto-basics/slides.qmd) · [Course](courses/01-crypto-basics/index.qmd) · [Handout](courses/01-crypto-basics/handout.md) | [Slides](courses/01-crypto-basics/slides.nl.qmd) · [Cursus](courses/01-crypto-basics/README.nl.md) · [Hand-out](courses/01-crypto-basics/handout.nl.md) |
+| 02 | TLS & PKI in practice *(planned)* | [Outline](courses/02-tls-and-pki/index.qmd) | |
+| 03 | Bash for the rest of us *(planned)* | [Outline](courses/03-bash-for-the-rest-of-us/index.qmd) | |
+
+The source for everything is on GitHub.
