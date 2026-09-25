@@ -26,7 +26,7 @@
 ## Adding a course
 
 ```bash
-cp -r _template courses/04-my-topic
+cp -r _template courses/05-my-topic
 ```
 
 Then:
@@ -89,5 +89,31 @@ you, so they don't silently stop working:
 - Before a session, check the whole deck: open it with `?print-pdf` in the
   browser, or export it with
   `docker run --rm -v "$PWD/_site":/site ghcr.io/astefanutti/decktape reveal file:///site/courses/NN-topic/slides.html /site/slides.pdf`.
+- For **gitGraph** diagrams, copy the brand-colour line from an existing
+  gitGraph in [courses/03-git/slides.qmd](courses/03-git/slides.qmd).
 - Aim for about one slide per minute of talking, and one idea per slide.
 - Preview with `quarto preview path/to/slides.qmd`.
+
+## Look and feel (INFO brand)
+
+The slides and the website follow the look of [info.nl](https://www.info.nl/).
+
+- **Colours and fonts** live in one place: [shared/_brand.scss](shared/_brand.scss).
+  [shared/theme.scss](shared/theme.scss) (slides) and
+  [shared/website.scss](shared/website.scss) (web pages) both use it.
+- **Fonts:** *Outfit* for everything, *Playfair Display* for subtitles and
+  "kicker" lines. Both are free (Open Font License) and load from Google Fonts.
+- **Colours:** deep teal `#004449` and mint `#d2fccb` for panels and emphasis,
+  charcoal `#2e3335` for headings, pale teal `#ceeae8` for table headers and
+  light panels. The bright green `#64ff64` is an **accent only** (the wavy line,
+  circles), never for text: it's unreadable on white.
+- **What you get for free:** `# Part …` headings become teal panels with the
+  green wave, bullets become → arrows, numbered lists get teal numbers, and
+  `::: golden` becomes a teal key-message panel. Put a small serif line above a
+  heading with `[Digital Decoded]{.kicker}`.
+- **Illustrations:** the website uses black-and-white cut-out photos with a
+  green circle or wave. Get official images from marketing, put them in
+  `shared/images/`, and ask before using any photo from the website itself.
+- **Logo:** not included. If marketing supplies one, put it in
+  `shared/images/` and add `logo: ../../shared/images/<file>` to the deck's
+  `revealjs` options.

@@ -1,0 +1,499 @@
+---
+title: "HTTPS en verder"
+subtitle: "TLS & PKI in de praktijk · Cursus 02"
+lang: nl
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 02 · TLS & PKI in de praktijk"
+    code-copy: true
+---
+
+## "Er staat een hangslotje, dus het is veilig, toch?" {.center}
+
+> Een collega stuurt een link door: *"De klant zegt dat ons nieuwe
+> partnerportaal in orde is, want er staat een hangslotje. Kun je dat bevestigen?"*
+
+. . .
+
+Wat belooft dat hangslot eigenlijk? Wat belooft het niet?
+En wat moet er achter de schermen gebeuren om het te krijgen?
+
+::: notes
+Haal twee of drie antwoorden op uit de zaal. Veelgehoorde ideeën: "het is
+veilig", "het is gecontroleerd", "het is het echte bedrijf". Aan het eind van
+deel 1 komen we hierop terug.
+:::
+
+## Waar we gebleven waren (cursus 01)
+
+- **De private key blijft thuis. De public key reist.**
+- Een **certificaat** = een public key + een naam, ondertekend door een **CA**
+- Een **keten**: root CA → intermediate CA → server
+- **ServerAuth**: de client controleert de server · **ClientAuth**: de server controleert de client
+
+Vandaag: hoe dat werkt in **HTTPS**, waar het misgaat, en hoe je het draaiende houdt.
+
+::: notes
+Vraag even om handen: wie was er bij cursus 01? Als de meesten er niet waren,
+neem dan een minuut extra voor de hangslot-metafoor en de slide over de keten.
+:::
+
+## Vandaag
+
+1. **HTTPS, stap voor stap**
+2. **Ketens in het wild**: waar de supporttickets vandaan komen
+3. **Mutual TLS**: als de server de client controleert
+4. **Levenscyclus**: certificaten van 47 dagen, automatisering, formaten
+5. **Opdrachten**:
+   - 🗣 **Uitleggers**: scenariokaarten
+   - 🛠 **Bouwers**: je eigen HTTPS-server, op drie manieren stuk, plus mTLS
+
+# Deel 1 · HTTPS, stap voor stap
+
+## Achter `https://shop.example`
+
+```{mermaid}
+sequenceDiagram
+  participant B as Browser
+  participant D as DNS
+  participant S as shop.example
+  B->>D: waar staat shop.example?
+  D->>B: 203.0.113.10
+  B->>S: open een verbinding op poort 443
+  B->>S: TLS-handshake 🤝 (volgende slide)
+  Note over B,S: 🔒 vanaf hier is alles versleuteld
+  B->>S: GET /checkout (HTTP, door de tunnel)
+  S->>B: 200 OK + de pagina
+```
+
+**HTTPS = gewoon HTTP, verstuurd door een TLS-tunnel.** Het maakt TLS niet uit wat erdoorheen gaat.
+
+::: notes
+Dezelfde TLS zit onder e-mail (SMTP/IMAP met STARTTLS), databaseverbindingen,
+MQTT, gRPC, LDAPS, enzovoort. HTTPS is gewoon de bekendste passagier.
+:::
+
+## De TLS 1.3-handshake, in kleutertaal
+
+```{mermaid}
+sequenceDiagram
+  participant B as Browser
+  participant S as Server
+  B->>S: Hoi shop.example! Ik spreek TLS 1.3 en AES-GCM. Hier is mijn helft van de verf 🎨
+  S->>B: We nemen AES-GCM. Hier is mijn helft van de verf 🎨
+  Note over B,S: allebei mengen ze de verf → zelfde geheim → versleuteling aan
+  S->>B: Mijn paspoort 🪪 (certificaat + intermediates)
+  S->>B: Mijn handtekening ✍️ over dit hele gesprek
+  B->>B: controleert paspoort en handtekening
+  B->>S: Alles goed. Hier is mijn verzoek 📨
+```
+
+Eén keer heen en weer, en het gesprek is al versleuteld voordat het certificaat überhaupt verstuurd wordt.
+
+::: notes
+ClientHello met SNI en key share; ServerHello met key share (ECDHE, tegenwoordig
+vaak hybride met ML-KEM voor post-quantum); Certificate; CertificateVerify;
+Finished. De handtekening is het cruciale stuk: die bewijst dat de server de
+private key heeft die bij het certificaat hoort, voor DIT gesprek.
+Alleen een gekopieerd certificaat is voor een aanvaller niets waard.
+:::
+
+## Wat de browser controleert
+
+| Controle | Vraag | Als het misgaat |
+|----------|-------|-----------------|
+| **Keten** | Leidt hij naar een root in mijn trust store? | *not trusted* / *unknown issuer* |
+| **Naam** | Staat `shop.example` in de **SAN**-lijst van het certificaat? | *name mismatch* |
+| **Datums** | Ligt vandaag tussen *not before* en *not after*? | *expired* |
+| **Gebruik** | Mag hij gebruikt worden voor **ServerAuth**? | *unsuitable purpose* |
+| **Bewijs** | Heeft de server de handshake ondertekend met de bijbehorende private key? | handshake mislukt |
+
+::: small
+Intrekking (is het certificaat teruggetrokken?) wordt hooguit met horten en stoten gecontroleerd. Meer daarover in deel 4.
+:::
+
+::: notes
+SAN = Subject Alternative Name, de lijst met namen in het certificaat.
+Browsers negeren het oude "CN"-veld voor namen; alleen de SAN telt.
+:::
+
+## Wat het hangslot belooft, en wat niet
+
+:::: {.columns}
+::: {.column width="50%"}
+### ✅ Het belooft wel
+
+- Niemand onderweg kan het verkeer **lezen** of **veranderen**
+- Je praat met iemand die **deze naam** in handen heeft, volgens een CA die je browser vertrouwt
+:::
+::: {.column width="50%"}
+### ❌ Het belooft niet
+
+- dat het **bedrijf** erachter eerlijk is
+- dat het de naam is die je **bedoelde** (`shop-example.com`?)
+- dat de site zelf vrij is van **bugs of malware**
+:::
+::::
+
+**Phishingsites hebben ook een hangslot.** Certificaten zijn gratis en geautomatiseerd, voor iedereen.
+
+::: notes
+Terug naar de openingsvraag: het hangslot zegt "privélijn met wie deze
+domeinnaam bezit". Of dat de juiste partner is, is een andere vraag: kijk goed
+naar de naam.
+:::
+
+## Wat een afluisteraar nog wel ziet
+
+| Zichtbaar 👀 | Verborgen 🔒 |
+|--------------|--------------|
+| Jouw IP-adres en dat van de server | Het volledige URL-pad: `/checkout?id=42` |
+| De **naam** `shop.example` (DNS, en de SNI in de handshake) | Headers, cookies, wachtwoorden |
+| Wanneer, hoe vaak, en ongeveer hoeveel | De inhoud |
+
+::: small
+Nieuwere standaarden verbergen ook de naam: DNS over HTTPS, en **Encrypted Client Hello (ECH)**.
+:::
+
+::: notes
+"We gebruiken HTTPS" betekent dus niet "niemand kan weten dat onze gebruikers
+deze site bezoeken". Voor de meeste zakelijke toepassingen is dat prima; voor
+gevoelige diensten is het goed om te weten.
+:::
+
+## http:// → https://, en daar blijven
+
+- Ga je naar `http://shop.example`, dan **stuurt** de server je **door** naar `https://`
+- Maar dat eerste verzoek was onbeschermd, dus een aanvaller kon het onderscheppen
+- **HSTS**-header: *"gebruik voor deze site alleen nog HTTPS, het komende jaar"*
+
+```text
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+
+::: notes
+Met HSTS schakelt de browser de volgende keer zelf over op HTTPS, voordat er
+iets over de lijn gaat. De "preload list" doet dat zelfs bij het allereerste
+bezoek. Pas op met includeSubDomains: elk subdomein moet dan HTTPS ondersteunen.
+:::
+
+# Deel 2 · Ketens in het wild
+
+## Elk programma heeft zijn eigen lijst met CA's
+
+| Wie | Trust store |
+|-----|-------------|
+| Windows, macOS | de certificaatopslag van het besturingssysteem |
+| Chrome, Edge, Firefox | eigen root-programma (Firefox: eigen opslag) |
+| Linux, `curl`, Docker-images | `/etc/ssl/certs/ca-certificates.crt` |
+| Java | `cacerts` (keytool) |
+| Python `requests` | package `certifi` |
+| Node.js | ingebouwde lijst, plus `NODE_EXTRA_CA_CERTS` |
+
+**"Het werkt in mijn browser"** zegt niets over de Java-client van de partner.
+
+::: notes
+De sandbox heeft 150 roots in zijn trust store; de bouwers bekijken die in
+opdracht 1. Een private root CA toevoegen betekent: toevoegen aan *elke* store
+die hem nodig heeft. Het besturingssysteem, Java, Python, het Docker-image…
+:::
+
+## Supportticket 1: de ontbrekende intermediate
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  S["🪪 shop.example"] -- "ondertekend door" --> I["🏢 Intermediate CA<br/>❓ niet meegestuurd"] -- "ondertekend door" --> R["🏛 Root CA<br/>in trust store"]
+```
+
+- De server stuurt alleen zijn eigen certificaat mee, niet de intermediate
+- Browsers **halen** de ontbrekende intermediate vaak zelf op of hebben hem **in hun cache**, en dat verbergt de fout
+- Java, Python, curl en de meeste API-clients doen dat **niet**: *unable to get local issuer certificate*
+
+**Oplossing, op de server:** stel de **volledige keten** in (leaf + intermediates).
+
+::: notes
+Dit is het vaakst voorkomende "jullie certificaat is stuk"-ticket. De
+oplossing zit altijd aan de serverkant: gebruik fullchain.pem in plaats van
+cert.pem. Bouwers maken precies dit stuk en weer heel in opdracht 3.
+:::
+
+## Supportticket 2: de verkeerde naam
+
+- Het certificaat zegt `shop.example`, de gebruiker typte `www.shop.example` → **mismatch**
+- De **SAN-lijst** moet **elke** naam bevatten die mensen en systemen gebruiken
+- Een wildcard `*.shop.example` dekt `api.shop.example`, **niet** `shop.example` of `a.b.shop.example`
+- Wordt er een IP-adres of `localhost` gebruikt, dan moet dat ook in de SAN
+
+::: notes
+Klassieker na een migratie: een nieuwe hostnaam voor de loadbalancer, of een
+API die op IP-adres wordt aangeroepen. De oplossing is een nieuw certificaat
+met de juiste namen.
+:::
+
+## Private CA's: je eigen notariskantoor
+
+- Prima voor **interne** diensten en **partner**koppelingen: jij bepaalt de regels
+- Browsers en partners **kennen jouw root niet**
+- Je moet je **root-CA-certificaat** dus **verspreiden** naar elke client die het nodig heeft (veilig om te delen)
+- En de **private key van de CA** bewaken als de kroonjuwelen
+
+::: notes
+Stuur het root-CA-certificaat via een kanaal waarin de fingerprint te
+controleren is (projectportaal, of lees de fingerprint telefonisch voor), zodat
+niemand er ongemerkt een eigen root tussen kan schuiven.
+:::
+
+## "Van wie is dit hangslot?" op het werk: TLS-inspectie
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  L["💻 bedrijfslaptop<br/>vertrouwt Corp Proxy CA"] -- "🔒 certificaat van de proxy" --> P["🕵️ bedrijfsproxy"] -- "🔒 echt certificaat" --> W["🌐 shop.example"]
+```
+
+- Veel bedrijven inspecteren HTTPS: de proxy **maakt voor elke site een eigen certificaat**
+- Dat werkt omdat IT de **root CA van de proxy** op de bedrijfslaptops heeft gezet
+- Developertools met een eigen trust store falen dan… en mensen "lossen dat op" met `--insecure` 🚩
+
+::: notes
+De juiste oplossing is de proxy-root van het bedrijf toevoegen aan de trust
+store van die tool (REQUESTS_CA_BUNDLE, NODE_EXTRA_CA_CERTS, keytool
+-importcert), niet de controle uitzetten. Het laat ook zien hoe machtig een
+trust store is: wie er een root aan kan toevoegen, kan je verkeer lezen.
+:::
+
+# Deel 3 · Mutual TLS
+
+## mTLS: nu vraagt de server het ook
+
+```{mermaid}
+sequenceDiagram
+  participant C as Acme (client)
+  participant S as Onze API
+  C->>S: Hoi api.example! Hier is mijn helft van de verf 🎨
+  S->>C: Mijn helft van de verf 🎨, mijn paspoort 🪪, mijn handtekening ✍️
+  S->>C: En nu het jouwe graag. Ik accepteer paspoorten van Our Partner CA
+  C->>S: Mijn paspoort 🪪 (clientcertificaat)
+  C->>S: Mijn handtekening ✍️ over dit gesprek
+  S->>S: controleert paspoort, handtekening en naam van Acme
+  C->>S: Verzoek 📨
+```
+
+Dezelfde controles als eerst, maar nu de andere kant op. Acme **bewijst** dat het zijn private key heeft.
+
+::: notes
+TLS 1.3: CertificateRequest van de server, daarna Certificate + CertificateVerify
+van de client. De server vertelt de client welke CA's hij accepteert; zo kiest
+een client met meerdere certificaten de juiste.
+:::
+
+## Een partner aansluiten (onze private CA)
+
+```{mermaid}
+sequenceDiagram
+  participant A as Acme
+  participant U as Wij
+  U->>A: We gebruiken mTLS. Stuur ons een CSR voor CN=acme-api-client
+  A->>A: maakt sleutelpaar, private key blijft bij Acme 🔑
+  A->>U: CSR 📝
+  U->>U: checken of het echt Acme is (bel ze!), dan ondertekenen
+  U->>A: clientcertificaat 🪪 + CA-certificaat van onze server
+  A->>U: testaanroep → ✅
+```
+
+De **private key reist nooit**. Alleen een CSR en certificaten.
+
+::: notes
+De stap "bel ze" is belangrijk: iedereen kan een CSR sturen en beweren dat
+hij Acme is. Controleer het via een bekend kanaal, bijvoorbeeld door de
+fingerprint van de CSR telefonisch te vergelijken. Model B: Acme heeft een
+eigen CA en stuurt ons zijn CA-keten; wij vertrouwen die CA, beperkt tot de
+certificaatnaam van Acme.
+:::
+
+## Op de server: vertrouwen **en** controleren wie
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name api.example;
+
+  # who we are: leaf + intermediates, and our key
+  ssl_certificate     /etc/ssl/api/fullchain.pem;
+  ssl_certificate_key /etc/ssl/api/api.key;
+
+  # who may call: the CA we trust, enforced
+  ssl_client_certificate /etc/ssl/partners/clientca.crt;
+  ssl_verify_client      on;
+
+  # …and only Acme
+  if ($ssl_client_s_dn !~ "CN=acme-api-client") { return 403; }
+}
+```
+
+::: notes
+De trust anchor beantwoordt "is dit paspoort echt?". De naamcontrole
+beantwoordt "is dit de persoon die we verwachten?". Geeft de CA ook
+certificaten aan anderen uit, dan heb je ze allebei nodig. Bouwers zien in
+opdracht 4 dat "controleren" niet hetzelfde is als "afdwingen": de testserver
+van OpenSSL logt een fout certificaat, maar laat het toch binnen, tenzij je
+zegt dat hij het moet weigeren.
+:::
+
+## ClientAuth in 2026
+
+- Sinds **15 juni 2026** geven publieke CA's geen certificaten voor **ClientAuth** meer uit
+- Clientcertificaten komen van een **private CA**: die van ons, die van de partner, of die van een gespecialiseerde aanbieder
+- Check bestaande mTLS-koppelingen: een vernieuwd certificaat van een publieke CA **werkt niet meer**
+
+::: notes
+Beleid van het Chrome-root-programma: publiek vertrouwde TLS-hiërarchieën zijn
+alleen nog voor serverauthenticatie. DigiCert en Let's Encrypt waren in mei
+2026 al gestopt. Bestaande certificaten blijven werken tot ze verlopen, dus de
+problemen duiken op bij het vernieuwen.
+:::
+
+# Deel 4 · Levenscyclus
+
+## Certificaten leven steeds korter
+
+| Uitgegeven vanaf | Maximale geldigheid (publieke TLS) |
+|------------------|------------------------------------|
+| tot maart 2026 | 398 dagen |
+| **15 maart 2026** | **200 dagen** |
+| 15 maart 2027 | 100 dagen |
+| 15 maart 2029 | **47 dagen** |
+
+Elke zes weken met de hand vernieuwen is geen plan. **Vernieuwen moet automatisch.**
+
+::: notes
+CA/Browser Forum ballot SC-081v3 (april 2025). De redenering: een gelekte key
+of een verkeerd certificaat is dan veel korter een probleem, en intrekken
+werkt niet goed (zie twee slides verder). Private CA's zijn hier niet aan
+gebonden, maar dezelfde logica geldt.
+:::
+
+## Automatiseren: ACME
+
+- **ACME** (RFC 8555) is het protocol voor automatische certificaten: bewijs
+  dat je het domein beheert, krijg een certificaat, vernieuw het op tijd, zonder dat er een mens aan te pas komt
+- Tools: `certbot`, `acme.sh`, Caddy, Kubernetes `cert-manager`, en ingebouwd in de meeste cloud-loadbalancers en CDN's
+- Het sleutelpaar wordt gemaakt **waar het gebruikt wordt**, dus de gouden regel klopt vanzelf
+
+**Vraag die je elke leverancier stelt:** *"Gaat het vernieuwen van certificaten automatisch? Wie krijgt de melding als het misgaat?"*
+
+## Monitor wat je niet kunt automatiseren
+
+```bash
+openssl x509 -in shop.crt -noout -enddate
+openssl x509 -in shop.crt -noout -checkend 2592000 && echo "OK for 30 more days"
+```
+
+- Monitor het **live** endpoint, niet een bestand ergens: dat is wat clients zien
+- Waarschuw **weken** van tevoren, en stuur de melding naar een **team**, niet naar iemand die op vakantie is
+- Houd een overzicht bij: welke certificaten, waar, wie is eigenaar, hoe worden ze vernieuwd
+
+::: notes
+2592000 seconden = 30 dagen. Bouwers gebruiken -checkend in opdracht 5. Veel
+storingen komen neer op "het certificaat was verlopen en de enige die ervan
+wist, werkt hier niet meer".
+:::
+
+## Intrekken, en waarom korte geldigheid wint
+
+- Een CA kan een certificaat **intrekken** (key gestolen, per ongeluk uitgegeven)
+- Clients horen dat te controleren (CRL, OCSP), maar in de praktijk doen veel het **niet**, of geven ze het op als de controle mislukt
+- Publieke CA's stappen af van OCSP; korte geldigheid doet het zware werk
+
+**Lekt er een private key:** trek het certificaat in **en** vervang het sleutelpaar **en** zoek uit hoe het gelekt is.
+
+## Pinning: extra slot, extra risico
+
+- **Pinning** = "accepteer alleen *precies dit* certificaat of deze key", bovenop de normale controles
+- Komt veel voor in mobiele apps en partnerkoppelingen
+- Elke vernieuwing **breekt** dan de client die gepind heeft, tenzij je daar rekening mee hebt gehouden
+
+**Moet je pinnen:** pin de CA (of de key, niet het certificaat), houd een reserve-pin achter de hand, en spreek met de partner een plan af voor vervanging.
+
+## Zelfde certificaat, andere verpakking
+
+| Software | Wil |
+|----------|-----|
+| nginx, Apache, HAProxy, de meeste Linux-tools | **PEM**: `fullchain.pem` + `privkey.pem` (HAProxy: allebei in één bestand) |
+| Windows, IIS, Azure | **PKCS#12**: `.pfx` / `.p12` met wachtwoord |
+| Java | keystore: **PKCS#12** of het oudere **JKS** |
+
+Omzetten is prima, **op de eigen machine van de eigenaar**. De private key blijft nog steeds thuis.
+
+```shell
+openssl pkcs12 -export -in shop.crt -inkey shop.key \
+    -certfile intermediate.crt -out shop.p12
+```
+
+## Rode vlaggen 🚩
+
+- `curl -k`, `--insecure`, `verify=False`, `NODE_TLS_REJECT_UNAUTHORIZED=0`
+- *"Het werkt in de browser, dus het certificaat is in orde"*
+- *"We hebben jullie certificaat vastgepind"*, zonder plan voor vervanging
+- *"Niemand weet wie dat certificaat vernieuwt"*
+- *"Koop gewoon een clientcertificaat bij een publieke CA"* (kan sinds juni 2026 niet meer)
+
+## Samengevat {.smaller}
+
+1. **HTTPS = HTTP binnen TLS.** De handshake spreekt een geheim af, daarna bewijst de server wie hij is
+2. De client controleert **keten, naam, datums, gebruik, en bewijs van de private key**
+3. Het hangslot betekent **privélijn met deze naam**, niet "betrouwbaar bedrijf"
+4. De meeste tickets gaan over een **ontbrekende intermediate**, een **verkeerde naam** of een **verlopen** certificaat
+5. **mTLS**: de client maakt zijn eigen key, de server vertrouwt een CA **en** controleert de naam
+6. **Certificaten van 47 dagen** komen eraan: automatiseer het vernieuwen, monitor het live endpoint
+
+## Opdrachten: kies je track (≈ 16 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Uitleggers
+
+Geen terminal nodig. In tweetallen:
+
+**Scenariokaarten: HTTPS in het echt**
+
+`exercises/tabletop-https-in-real-life.nl.md`
+:::
+::: {.column width="50%"}
+### 🛠 Bouwers
+
+In de sandbox:
+
+1. HTTPS in het wild *(internet nodig)*
+2. Bouw een vertrouwensketen
+3. Je eigen HTTPS-server, op drie manieren stuk
+4. Mutual TLS
+5. *Bonus: verloopdatums en formaten*
+:::
+::::
+
+## Foutmeldingen ontcijferd
+
+| Je ziet | Het betekent | Wie lost het op |
+|---------|--------------|-----------------|
+| `unable to get local issuer certificate`, `PKIX path building failed` | ontbrekende intermediate, of een private CA die de client niet kent | server (volledige keten) of client (root toevoegen) |
+| `no alternative certificate subject name matches` | naam staat niet in de SAN-lijst | server: nieuw certificaat |
+| `certificate has expired` | verlopen | eigenaar van het certificaat |
+| `alert certificate required` | mTLS: de client stuurde geen certificaat | client |
+| `alert unknown ca` | mTLS: clientcertificaat van een CA die de server niet vertrouwt | de CA afspreken |
+
+## Nabespreking {.center}
+
+Foutmeldingen ontcijferd hierboven, en één scenariokaart, met z'n allen.
+
+Vragen? 🙋
+
+::: notes
+Loop de foutmeldingen door: vraag bij elke regel "wij of zij?". Daarna
+presenteert een tweetal uitleggers kaart 4 (mTLS-onboarding), en vullen de
+bouwers aan welke commando's zij zouden draaien.
+:::

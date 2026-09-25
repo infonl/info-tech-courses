@@ -28,7 +28,7 @@ filters:
 
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, shared/website.scss]
     toc: true
     code-copy: true
 

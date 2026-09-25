@@ -1,0 +1,10 @@
+// Style rules that don't fit these course files
+{
+  "MD013": false, // line length: tables and links are long
+  "MD024": false, // same heading in several scenario cards
+  "MD029": false, // numbered lists that continue after a heading (goals 4, 5…)
+  "MD033": false, // <br/> in tables
+  "MD036": false, // **Everyone** / **Explainers** as small labels
+  "MD041": false, // first line is the language switch, not a heading
+  "MD060": false  // compact table style
+}

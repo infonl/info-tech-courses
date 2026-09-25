@@ -1,0 +1,464 @@
+---
+title: "Een tijdmachine van plakbriefjes"
+subtitle: "Git voor iedereen · Cursus 03"
+lang: nl
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 03 · Git"
+    code-copy: true
+---
+
+## "Ik force-push main even om het op te schonen" {.center}
+
+> Een developer in de teamchat, vrijdag 16:45: *"De geschiedenis op main is een
+> zooitje. Ik squash alles en force-push, dan ziet het er netjes uit."*
+
+. . .
+
+Goed idee? Wat kan er misgaan, en voor wie? Wat zou die developer beter kunnen doen?
+
+::: notes
+Laat mensen reageren. Geef het antwoord nog niet; in deel 4 komen we op dit
+bericht terug.
+:::
+
+## Vandaag
+
+1. **Waarom git**: wat er eerst was, en waarom git won
+2. **Onder de motorkap**: foto's en plakbriefjes
+3. **Samenwerken**: branches, merges, rebase, squash, cherry-pick, pull requests
+4. **Voorgoed vastgelegd**: de gouden regel, force-push, reflog, geheimen
+5. **Opdrachten**:
+   - 🗣 **Uitleggers**: scenariokaarten
+   - 🛠 **Bouwers**: git in de sandbox
+
+## Git in één slide
+
+::: golden
+Git is een **fotoalbum** van je project. Elke foto wijst naar de foto
+ervoor. **Branches en tags zijn plakbriefjes** op foto's.
+:::
+
+Bijna alles in git komt neer op: een foto maken, of een plakbriefje verplaatsen.
+
+::: notes
+Kom steeds terug op dit beeld. Merge: een foto met twee "vorige" foto's.
+Rebase: foto's opnieuw maken, bovenop een andere foto. Force-push: het
+plakbriefje van iemand anders verplaatsen.
+:::
+
+# Deel 1 · Waarom git
+
+## Vóór versiebeheer
+
+```text
+offerte.docx
+offerte_v2.docx
+offerte_v2_JAN.docx
+offerte_v3_final.docx
+offerte_v3_final_REALLY_FINAL(2).docx
+```
+
+- **Welke is de nieuwste?** Wie heeft wat veranderd, en waarom?
+- Twee mensen werken tegelijk aan hetzelfde bestand → **iemands werk raakt kwijt**
+- *"Gisteren werkte het nog"*: maar welke versie was dat dan?
+
+## De voorouders
+
+| Jaar | Tool | Het idee |
+|------|------|----------|
+| 1972 · 1982 | SCCS, RCS | geschiedenis van **losse bestanden** |
+| 1990 | CVS | **hele projecten**, op één centrale server |
+| 2000 | Subversion (SVN) | "CVS, maar dan goed": atomaire commits, nog steeds **centraal** |
+| 2002–2005 | BitKeeper | **gedistribueerd**, maar niet open. Gebruikt voor de Linux-kernel |
+| **April 2005** | **Git** (Linus Torvalds), Mercurial | De gratis licentie van BitKeeper wordt ingetrokken. Binnen een paar dagen beheert git zijn eigen code |
+| 2008 | GitHub | git wordt **sociaal**: forks en pull requests |
+
+::: notes
+Centrale systemen: ligt de server eruit, dan kan niemand committen. En
+branchen is duur, dus mensen doen het liever niet. Gedistribueerd: elke clone
+heeft de volledige geschiedenis. De ontwerpdoelen van Linus: snel,
+gedistribueerd, goed beschermd tegen corruptie, en geschikt voor duizenden
+branches tegelijk (zo werkt de kernel).
+:::
+
+## Waarom git het won
+
+- **Gedistribueerd**: elke kopie heeft de **volledige geschiedenis**: offline werken, en elke clone is een back-up
+- **Goedkope branches**: een branch is een plakbriefje, dus een branch per feature werd normaal
+- **Integriteit**: alles heeft zijn vingerafdruk als naam. Stille corruptie of geknoei valt op
+- **Snel**: de meeste handelingen gaan nooit over het netwerk
+- **Netwerkeffect**: de Linux-kernel als bewijs, daarna maakten GitHub en GitLab het de standaard
+
+Vandaag gebruikt **meer dan 90%** van de developers git. Mercurial was technisch net zo goed; GitHub gaf de doorslag.
+
+::: notes
+Bitbucket stopte in 2020 met Mercurial. In de developer survey van Stack
+Overflow staat git al jaren boven de 90%. Git wordt ook ver buiten code
+gebruikt: documentatie (zoals deze cursus!), infrastructuurconfiguratie,
+juridische teksten.
+:::
+
+# Deel 2 · Onder de motorkap
+
+## Een commit is een foto van alles
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  C2["📸 commit 093294f<br/>Say what we sell"] -- parent --> C1["📸 commit 5b2c200<br/>Add README"]
+  C2 --> T2["📁 tree"] --> B2["📄 README.md<br/>blob 91759b8"]
+  C1 --> T1["📁 tree"] --> B1["📄 README.md<br/>blob ce01362"]
+```
+
+- **Geen** lijstje wijzigingen, maar een **momentopname** van alle bestanden (ongewijzigde bestanden worden gewoon hergebruikt)
+- Elke commit legt vast: de momentopname, de **parent** (de vorige commit), wie, wanneer, en **waarom** (de message)
+
+::: notes
+blob = inhoud van een bestand, tree = map, commit = momentopname + gegevens
+erover. Identieke bestanden worden maar één keer opgeslagen, dus
+momentopnames zijn goedkoop. Bouwers zien precies deze objecten met git
+cat-file in opdracht 1.
+:::
+
+## Alles heeft zijn vingerafdruk als naam
+
+```bash
+echo "hello" | git hash-object --stdin
+```
+
+```text
+ce013625030ba8dba906f756967f9e9ca394464a
+```
+
+- Zelfde inhoud → **zelfde naam**, op elke computer ter wereld
+- Een commit bevat de vingerafdruk van zijn **parent** → verander iets in het
+  verleden, en **elke** vingerafdruk daarna verandert mee
+- Geschiedenis kun je niet **stilletjes** veranderen, alleen **vervangen**
+
+::: notes
+Hetzelfde idee als de keten van certificaten in cursus 01, en trouwens ook
+als een blockchain: elke schakel bevat de hash van de vorige. Git gebruikt
+SHA-1 (beveiligd tegen de bekende aanvallen) en ondersteunt ook
+SHA-256-repositories.
+:::
+
+## Branches en tags zijn plakbriefjes
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "Add README" tag: "v1.0"
+  commit id: "Say what we sell"
+  branch feature
+  checkout feature
+  commit id: "Add prices"
+  checkout main
+  commit id: "Welcome text"
+```
+
+- Een **branch** = een bestand met één hash erin. Hij **schuift op** als je erop commit
+- Een **tag** = hetzelfde, maar die **blijft staan**: "dit is versie 1.0"
+- **HEAD** = *"je bent hier"*: de branch waar je op zit
+
+::: notes
+`cat .git/refs/heads/main` laat een bestand van 41 bytes zien. Daarom zijn
+branches in git goedkoop, en in oudere systemen die hele mappen kopieerden duur.
+:::
+
+## Diffs worden berekend, niet opgeslagen
+
+- Git slaat **momentopnames** op; een **diff** wordt berekend door er twee te vergelijken
+- Je kunt dus **elke** twee punten vergelijken: gisteren met vandaag, `main` met een branch, v1.0 met v2.0
+
+```diff
+ hello
+ We sell apples
++Welcome to the shop
+```
+
+- **Code review** is diffs lezen: wat verandert er precies als we dit accepteren?
+
+## Lokaal en remote
+
+- **Jouw repository**: het hele album, op je laptop
+- **Een remote** (GitHub, GitLab, Azure DevOps…): een gedeelde kopie waar iedereen mee synchroniseert
+- `push`: mijn nieuwe foto's versturen en het plakbriefje op de remote verplaatsen
+- `fetch` / `pull`: de foto's van de anderen ophalen (pull = fetch + merge of rebase)
+
+**De remote is gewoon nog een kopie.** Alles wat git lokaal doet, doet het daar ook.
+
+# Deel 3 · Samenwerken
+
+## Branch en merge
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  branch feature
+  checkout feature
+  commit id: "C"
+  commit id: "D"
+  checkout main
+  commit id: "E"
+  merge feature id: "M"
+```
+
+- **Fast-forward**: `main` is niet veranderd → schuif het plakbriefje gewoon door
+- **Merge commit** (`M`): allebei veranderd → een nieuwe foto met **twee parents**
+
+## Conflicten: git vraagt het een mens
+
+```text
+<<<<<<< HEAD
+Apples: 1.20 euro
+=======
+Apples: 80 cents
+>>>>>>> feature/cheaper
+```
+
+- Alleen als twee branches **dezelfde regels** hebben veranderd
+- Git weet niet wie gelijk heeft, en **geen van beide versies is "fout"**
+- Een mens beslist, past het bestand aan en maakt de merge af
+
+::: notes
+Conflicten zijn meer een communicatieprobleem dan een technisch probleem.
+Kleine branches die kort leven, geven minder en kleinere conflicten.
+:::
+
+## Rebase: mijn werk opnieuw afspelen, bovenop
+
+:::: {.columns}
+::: {.column width="50%"}
+**Ervoor**
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  branch feature
+  checkout feature
+  commit id: "X"
+  commit id: "Y"
+  checkout main
+  commit id: "C"
+```
+:::
+::: {.column width="50%"}
+**Na `git rebase main`**
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  commit id: "C"
+  branch feature
+  checkout feature
+  commit id: "X'"
+  commit id: "Y'"
+```
+:::
+::::
+
+`X'` en `Y'` zijn **nieuwe kopieën** met **nieuwe vingerafdrukken**. Een nette,
+rechte lijn, maar de geschiedenis is **herschreven**.
+
+## Squash: veel commits worden er één
+
+- *"wip"*, *"fix typo"*, *"oops"* → **één** commit: *"Add newsletter sign-up (#12)"*
+- Op je eigen branch: `git rebase -i`; of op het platform: **Squash and merge**
+- **Winst:** een leesbare geschiedenis op main, één commit per wijziging, makkelijk terug te draaien
+- **Verlies:** de details stap voor stap (die zie je nog wel in de pull request)
+
+## Cherry-pick: één fix kopiëren
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A" tag: "v1.0"
+  branch release-1.0
+  checkout main
+  commit id: "new feature"
+  commit id: "hotfix"
+  checkout release-1.0
+  cherry-pick id: "hotfix"
+```
+
+- Neem **één** commit en pas die ergens anders toe: de hotfix gaat naar de release, **zonder** de nieuwe features
+- De kopie krijgt een **nieuwe vingerafdruk**; de wijziging is dezelfde
+
+## Pull requests / merge requests
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  B["🌿 branch<br/>+ commits"] --> P["📬 pull request"]
+  P --> R["👀 review<br/>💬 discussie"]
+  P --> T["🤖 CI: tests, checks"]
+  R & T --> M["✅ merge naar main"] --> D["🚀 deploy"]
+```
+
+- *"Kijk je even naar mijn branch en merge je hem?"*: een functie van het **platform** (GitHub: pull request, GitLab: merge request), geen onderdeel van git zelf
+- De plek voor **review**, **automatische checks** en het **waarom** achter een wijziging
+
+::: notes
+Met branch protection rules op het platform kun je eisen dat er een PR is,
+een aantal goedkeuringen en groene checks voordat iets op main komt. En je kunt
+force-pushes verbieden.
+:::
+
+## Drie manieren om een pull request te mergen
+
+| Knop | Wat `main` krijgt | 👍 | 👎 |
+|--------|------------------|----|----|
+| **Merge commit** | alle commits + een merge commit | volledige, ware geschiedenis | drukke grafiek |
+| **Squash and merge** | **één** commit per PR | netjes, makkelijk terug te draaien | details van de branch alleen nog in de PR |
+| **Rebase and merge** | de commits, opnieuw afgespeeld op een rij | rechte geschiedenis, commits blijven bewaard | nieuwe hashes, elke commit moet goed zijn |
+: {tbl-colwidths="[22,26,26,26]"}
+
+Kies er **één** voor het team, en schrijf het op.
+
+## Branching-strategieën {.smaller}
+
+| Strategie | Hoe | Past bij |
+|----------|-----|------|
+| **Trunk-based** | piepkleine branches, dagelijks naar `main` gemerged; onaf werk achter feature flags | sterke CI, continuous deployment |
+| **GitHub flow** | kortlevende branch → pull request → `main` → deploy | de meeste webapps en SaaS |
+| **Release branches** | `main` + `release/1.x` per ondersteunde versie; fixes worden gecherry-pickt | producten met meerdere ondersteunde versies |
+| **GitFlow** | `develop`, `feature/*`, `release/*`, `hotfix/*` | releases met versienummers, grote teams. Vaak meer ceremonie dan nodig |
+: {tbl-colwidths="[20,45,35]"}
+
+**Vuistregel:** kortlevende branches, vaak mergen. Branches die lang blijven bestaan, groeien uit elkaar.
+
+# Deel 4 · Voorgoed vastgelegd
+
+## De gouden regel van git {.center}
+
+::: golden
+**Herschrijf nooit geschiedenis die iemand anders misschien al heeft.**
+:::
+
+Je eigen branch die je nog niet gedeeld hebt: ruim die zo veel op als je wilt.
+Een gedeelde branch (`main`, `release/*`, de branch van een collega): **alleen toevoegen, nooit herschrijven**.
+
+::: notes
+Rebase, squash, amend en reset maken allemaal nieuwe commits en verplaatsen
+plakbriefjes naar achteren of opzij. Prima, zolang jij de enige bent die de
+oude commits heeft gezien.
+:::
+
+## Force-push: het plakbriefje van een ander verplaatsen
+
+- `git push --force` laat het label op de remote wijzen waar **jij** wilt, en gooit weg wat niet in jouw kopie zit
+- Commits van collega's **verdwijnen** van de gedeelde branch, en hun volgende pull loopt in de soep
+- **Nooit** op `main`, release branches, of een andere branch waar anderen op werken. **Beveilig** die branches op het platform
+- Op **je eigen** branch na een rebase: `git push --force-with-lease`, die weigert als iemand anders intussen gepusht heeft
+
+::: notes
+Terug naar het bericht van de opening: main squashen en force-pushen maakt de
+clone van elke collega en elke openstaande pull request stuk, en vernietigt
+de audit trail. Bouwers doen precies dit bij "Bob" in opdracht 5.
+:::
+
+## Vooruit repareren: revert, niet uitwissen
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "bad change"
+  commit id: "B"
+  commit id: "Revert bad change" type: HIGHLIGHT
+```
+
+- **Vooruit repareren (fix forward):** `git revert` voegt een **nieuwe** commit toe die een oude ongedaan maakt
+- De geschiedenis vertelt het ware verhaal: **de fout en de oplossing**
+- Niemand die al gepulld heeft, komt in de problemen. De audit trail blijft heel
+
+## De reflog: het dagboek van git
+
+- Elke plek waar `HEAD` en je branches zijn geweest, op **jouw** computer, zo'n **90 dagen** lang
+- *"Ik heb een reset gedaan en alles is weg!"* → `git reflog` → `git reset --hard HEAD@{1}`
+- Een branch verwijderd? Git liet de hash zien toen je hem verwijderde
+- **Alleen gecommit werk** is beschermd. Wijzigingen die je niet gecommit hebt, kun je echt kwijtraken
+
+**Commit vroeg, commit vaak**: dan raak je bijna nooit echt iets kwijt.
+
+## Geheimen in git: ga ervan uit dat ze gelekt zijn
+
+- *"Ik heb het wachtwoord in de volgende commit weggehaald"*: het staat nog in **elke oudere momentopname**
+- Iedereen die gecloned heeft, heeft het, en bots scannen publieke repositories **binnen een paar minuten**
+- **Eerst:** trek het geheim in en **vervang** het (rotate). Daarna, als het nodig is, de geschiedenis opschonen (`git filter-repo`), met het hele team
+- **Voorkomen:** `.gitignore` voor `.env` en keys, secret scanning op het platform, een secrets manager
+
+::: notes
+Geschiedenis herschrijven om een geheim weg te halen is opruimen, geen
+oplossing: forks, clones, CI-caches en back-ups houden de oude commits. Pas
+door het geheim te vervangen, is het gelekte geheim niets meer waard.
+:::
+
+## Wie heeft dit veranderd, en waarom?
+
+- `git log`, `git blame`: elke regel leidt naar een commit, een auteur en een **message**
+- In de pull request staan de **discussie**, de review en de link naar het ticket
+- Dat is je **audit trail**, en die werkt alleen als je hem bijhoudt:
+  - goede commit messages: *waarom*, niet alleen *wat*
+  - gedeelde geschiedenis niet herschrijven
+  - ticketnummers in de titels van PR's of in commits
+
+## Rode vlaggen 🚩
+
+- *"Ik force-push main even"*
+- *"Laten we de hele geschiedenis squashen tot één commit"*
+- *"Ik heb het wachtwoord in de volgende commit weggehaald, dus het is goed"*
+- Een feature branch die al **drie maanden** openstaat
+- *"We hebben geen reviews nodig, we zijn allemaal senior"*
+- `.env`-, `*.key`- of `*.pfx`-bestanden in de repository
+
+## Samengevat {.smaller}
+
+1. Git is een **fotoalbum**: momentopnames met hun **vingerafdruk** als naam, die elk naar hun parent wijzen
+2. **Branches, tags en HEAD zijn plakbriefjes**: kleine labels, goedkoop om te maken
+3. **Merge** voegt werk samen; **rebase**, **squash** en **cherry-pick** maken **kopieën** met nieuwe vingerafdrukken
+4. In **pull requests** zitten de review, de checks en het *waarom*
+5. **Herschrijf nooit geschiedenis die iemand anders misschien al heeft**: geen force-push op gedeelde branches, **vooruit repareren** met revert
+6. De **reflog** redt gecommit werk; een gecommit **geheim** moet je **vervangen**
+
+## Opdrachten: kies je track (≈ 16 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Uitleggers
+
+Geen terminal nodig. In tweetallen:
+
+**Scenariokaarten: git in een team**
+
+`exercises/tabletop-git-in-a-team.nl.md`
+:::
+::: {.column width="50%"}
+### 🛠 Bouwers
+
+In de sandbox, steeds in dezelfde repository:
+
+1. Onder de motorkap
+2. Branches en merges
+3. Rebase, squash, cherry-pick
+4. Oeps: reflog en revert
+5. *Bonus: force-push, in het echt*
+:::
+::::
+
+## Nabespreking {.center}
+
+Eén scenariokaart, met z'n allen. En: wat zou jij antwoorden op het
+vrijdagbericht *"Ik force-push main even om het op te schonen"*?
+
+Vragen? 🙋

@@ -1,0 +1,491 @@
+---
+title: "HTTPS and beyond"
+subtitle: "TLS & PKI in practice · Course 02"
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 02 · TLS & PKI in practice"
+    code-copy: true
+---
+
+## "It has a padlock, so it's safe, right?" {.center}
+
+> A colleague forwards a link: *"The client says our new partner portal is
+> fine, because it has a padlock. Can you confirm?"*
+
+. . .
+
+What does the padlock actually promise? What doesn't it promise?
+And what has to happen behind the scenes to get it?
+
+::: notes
+Take two or three answers from the room. Common beliefs: "it's safe", "it's
+verified", "it's the real company". We'll come back to this at the end of Part 1.
+:::
+
+## Where we left off (course 01)
+
+- **The private key stays home. The public key travels.**
+- A **certificate** = a public key + a name, signed by a **CA**
+- A **chain**: root CA → intermediate CA → server
+- **ServerAuth**: the client checks the server · **ClientAuth**: the server checks the client
+
+Today: how that works in **HTTPS**, where it breaks, and how to keep it running.
+
+::: notes
+Quick show of hands: who was at course 01? If most weren't, spend one extra
+minute on the padlock metaphor and the chain slide.
+:::
+
+## Today
+
+1. **HTTPS, step by step**
+2. **Chains in the wild**: where the support tickets come from
+3. **Mutual TLS**: when the server checks the client
+4. **Life cycle**: 47-day certificates, automation, formats
+5. **Exercises**:
+   - 🗣 **Explainers**: scenario cards
+   - 🛠 **Builders**: your own HTTPS server, broken three ways, plus mTLS
+
+# Part 1 · HTTPS, step by step
+
+## Behind `https://shop.example`
+
+```{mermaid}
+sequenceDiagram
+  participant B as Browser
+  participant D as DNS
+  participant S as shop.example
+  B->>D: where is shop.example?
+  D->>B: 203.0.113.10
+  B->>S: open a connection to port 443
+  B->>S: TLS handshake 🤝 (next slide)
+  Note over B,S: 🔒 from here on, everything is encrypted
+  B->>S: GET /checkout (HTTP, inside the tunnel)
+  S->>B: 200 OK + the page
+```
+
+**HTTPS = plain HTTP, sent through a TLS tunnel.** TLS doesn't care what goes through it.
+
+::: notes
+The same TLS is under e-mail (SMTP/IMAP with STARTTLS), database connections,
+MQTT, gRPC, LDAPS, and so on. HTTPS is just the best-known passenger.
+:::
+
+## The TLS 1.3 handshake, like you're five
+
+```{mermaid}
+sequenceDiagram
+  participant B as Browser
+  participant S as Server
+  B->>S: Hi shop.example! I speak TLS 1.3 and AES-GCM. Here's my half of the paint 🎨
+  S->>B: Let's use AES-GCM. Here's my half of the paint 🎨
+  Note over B,S: both mix the paint → same secret → encryption on
+  S->>B: My passport 🪪 (certificate + intermediates)
+  S->>B: My signature ✍️ over this whole conversation
+  B->>B: check the passport and the signature
+  B->>S: All good. Here's my request 📨
+```
+
+One round trip, and the conversation is encrypted before the certificate is even sent.
+
+::: notes
+ClientHello with SNI and key share; ServerHello with key share (ECDHE, often
+hybrid with ML-KEM for post-quantum today); Certificate; CertificateVerify;
+Finished. The signature is the crucial bit: it proves the server holds the
+private key that belongs to the certificate, for THIS conversation.
+A copied certificate alone is worthless to an attacker.
+:::
+
+## What the browser checks
+
+| Check | Question | If it fails |
+|-------|----------|-------------|
+| **Chain** | Does it lead to a root in my trust store? | *not trusted* / *unknown issuer* |
+| **Name** | Is `shop.example` in the certificate's **SAN** list? | *name mismatch* |
+| **Dates** | Is today between *not before* and *not after*? | *expired* |
+| **Usage** | Is it allowed for **ServerAuth**? | *unsuitable purpose* |
+| **Proof** | Did the server sign the handshake with the matching private key? | handshake fails |
+
+::: small
+Revocation (has the certificate been withdrawn?) is checked patchily at best. More on that in Part 4.
+:::
+
+::: notes
+SAN = Subject Alternative Name, the list of names in the certificate.
+Browsers ignore the old "CN" field for names; it's SAN only.
+:::
+
+## What the padlock promises, and what it doesn't
+
+:::: {.columns}
+::: {.column width="50%"}
+### ✅ It does promise
+
+- Nobody on the way can **read** or **change** the traffic
+- You're talking to someone who controls **this name**, according to a CA your browser trusts
+:::
+::: {.column width="50%"}
+### ❌ It doesn't promise
+
+- that the **company** behind it is honest
+- that the name is the one you **meant** (`shop-example.com`?)
+- that the site itself is free of **bugs or malware**
+:::
+::::
+
+**Phishing sites have padlocks too.** Certificates are free and automated, for everyone.
+
+::: notes
+Back to the opening question: the padlock says "private line to whoever owns
+this domain name". Whether that's the right partner is a different question:
+check the name carefully.
+:::
+
+## What an eavesdropper still sees
+
+| Visible 👀 | Hidden 🔒 |
+|------------|-----------|
+| Your IP address and the server's | The full URL path: `/checkout?id=42` |
+| The **name** `shop.example` (DNS, and the SNI in the handshake) | Headers, cookies, passwords |
+| When, how often, and roughly how much | The content |
+
+::: small
+Newer standards hide the name too: DNS over HTTPS, and **Encrypted Client Hello (ECH)**.
+:::
+
+::: notes
+So "we use HTTPS" doesn't mean "nobody can know our users visit this site".
+For most business cases that's fine; for sensitive services it's worth knowing.
+:::
+
+## http:// → https://, and staying there
+
+- Visit `http://shop.example` → the server **redirects** to `https://`
+- But that first request was unprotected, so an attacker could intercept it
+- **HSTS** header: *"only ever use HTTPS for this site, for the next year"*
+
+```text
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+
+::: notes
+With HSTS, the browser upgrades to HTTPS by itself next time, before anything
+goes over the wire. The "preload list" does it even for the very first visit.
+Careful with includeSubDomains: every subdomain must then support HTTPS.
+:::
+
+# Part 2 · Chains in the wild
+
+## Every program has its own list of CAs
+
+| Who | Trust store |
+|-----|-------------|
+| Windows, macOS | the OS certificate store |
+| Chrome, Edge, Firefox | own root program (Firefox: own store) |
+| Linux, `curl`, Docker images | `/etc/ssl/certs/ca-certificates.crt` |
+| Java | `cacerts` (keytool) |
+| Python `requests` | `certifi` package |
+| Node.js | built-in list, plus `NODE_EXTRA_CA_CERTS` |
+
+**"It works in my browser"** proves nothing about the partner's Java client.
+
+::: notes
+The sandbox has 150 roots in its trust store; builders will look at it in
+exercise 1. Adding a private root CA means adding it to *every* store that
+needs it: the OS, Java, Python, the Docker image…
+:::
+
+## Support ticket #1: the missing intermediate
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  S["🪪 shop.example"] -- "signed by" --> I["🏢 Intermediate CA<br/>❓ not sent"] -- "signed by" --> R["🏛 Root CA<br/>in trust store"]
+```
+
+- The server sends only its own certificate, not the intermediate
+- Browsers often **fetch or cache** the missing intermediate, which hides the mistake
+- Java, Python, curl and most API clients **don't**: *unable to get local issuer certificate*
+
+**Fix, on the server:** configure the **full chain** (leaf + intermediates).
+
+::: notes
+This is the most common "your certificate is broken" ticket. The fix is always
+on the server side: use fullchain.pem instead of cert.pem. Builders break and
+fix exactly this in exercise 3.
+:::
+
+## Support ticket #2: the wrong name
+
+- The certificate says `shop.example`, the user typed `www.shop.example` → **mismatch**
+- The **SAN list** must contain **every** name people and systems use
+- A wildcard `*.shop.example` covers `api.shop.example`, **not** `shop.example` or `a.b.shop.example`
+- An IP address or `localhost` must be in the SAN too, if it's used
+
+::: notes
+Classic after a migration: a new hostname for the load balancer, or an API
+that's called by IP address. The fix is a new certificate with the right names.
+:::
+
+## Private CAs: your own notary office
+
+- Great for **internal** services and **partner** connections: you decide the rules
+- Browsers and partners **don't know your root**
+- So you must **distribute your root CA certificate** to every client that needs it (safe to share)
+- And guard the **CA's private key** like the crown jewels
+
+::: notes
+Send the root CA certificate through a channel where the fingerprint can be
+checked (project portal, or read the fingerprint aloud over the phone), so
+nobody can slip in their own root.
+:::
+
+## "Whose padlock?" at work: TLS inspection
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  L["💻 company laptop<br/>trusts Corp Proxy CA"] -- "🔒 proxy's certificate" --> P["🕵️ company proxy"] -- "🔒 real certificate" --> W["🌐 shop.example"]
+```
+
+- Many companies inspect HTTPS: the proxy **makes its own certificate** for every site
+- It works because IT installed the **proxy's root CA** on company laptops
+- Developer tools with their own trust store then fail… and people "fix" it with `--insecure` 🚩
+
+::: notes
+The right fix is to add the company's proxy root to that tool's trust store
+(REQUESTS_CA_BUNDLE, NODE_EXTRA_CA_CERTS, keytool -importcert), not to turn
+verification off. This also shows the power of a trust store: whoever can add
+a root can read your traffic.
+:::
+
+# Part 3 · Mutual TLS
+
+## mTLS: now the server asks too
+
+```{mermaid}
+sequenceDiagram
+  participant C as Acme (client)
+  participant S as Our API
+  C->>S: Hi api.example! Here's my half of the paint 🎨
+  S->>C: My half of the paint 🎨, my passport 🪪, my signature ✍️
+  S->>C: And now yours, please. I accept passports from Our Partner CA
+  C->>S: My passport 🪪 (client certificate)
+  C->>S: My signature ✍️ over this conversation
+  S->>S: check Acme's passport, signature, and name
+  C->>S: Request 📨
+```
+
+Same checks as before, in the other direction. Acme **proves** it holds its private key.
+
+::: notes
+TLS 1.3: CertificateRequest from the server, then Certificate + CertificateVerify
+from the client. The server tells the client which CAs it accepts; that's how
+a client with several certificates picks the right one.
+:::
+
+## Onboarding a partner (our private CA)
+
+```{mermaid}
+sequenceDiagram
+  participant A as Acme
+  participant U as Us
+  U->>A: We use mTLS. Please send a CSR for CN=acme-api-client
+  A->>A: generate key pair, private key stays at Acme 🔑
+  A->>U: CSR 📝
+  U->>U: check it's really Acme (call them!), then sign
+  U->>A: client certificate 🪪 + our server's CA certificate
+  A->>U: test call → ✅
+```
+
+The **private key never travels**. Only a CSR and certificates do.
+
+::: notes
+The "call them" step matters: anyone can send a CSR claiming to be Acme.
+Verify through a known channel, for example compare the CSR's fingerprint
+over the phone. Model B: Acme has its own CA and sends us its CA chain; we
+trust that CA, restricted to Acme's certificate name.
+:::
+
+## On the server: trust **and** check who
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name api.example;
+
+  # who we are: leaf + intermediates, and our key
+  ssl_certificate     /etc/ssl/api/fullchain.pem;
+  ssl_certificate_key /etc/ssl/api/api.key;
+
+  # who may call: the CA we trust, enforced
+  ssl_client_certificate /etc/ssl/partners/clientca.crt;
+  ssl_verify_client      on;
+
+  # …and only Acme
+  if ($ssl_client_s_dn !~ "CN=acme-api-client") { return 403; }
+}
+```
+
+::: notes
+The trust anchor answers "is this passport real?". The name check answers
+"is this the person we expect?". If the CA also issues certificates to others,
+you need both. Builders will see in exercise 4 that "checking" is not the same
+as "enforcing": OpenSSL's test server logs a bad certificate but lets it in,
+unless you tell it to refuse.
+:::
+
+## ClientAuth in 2026
+
+- Since **15 June 2026**, public CAs no longer issue certificates for **ClientAuth**
+- Client certificates come from a **private CA**: ours, the partner's, or a dedicated provider's
+- Check existing mTLS connections: a renewed certificate from a public CA **won't work any more**
+
+::: notes
+Chrome root program policy: publicly trusted TLS hierarchies are for server
+authentication only. DigiCert and Let's Encrypt stopped by May 2026. Existing
+certificates keep working until they expire, so problems appear at renewal time.
+:::
+
+# Part 4 · Life cycle
+
+## Certificates are getting shorter lives
+
+| Issued from | Maximum lifetime (public TLS) |
+|-------------|-------------------------------|
+| until March 2026 | 398 days |
+| **15 March 2026** | **200 days** |
+| 15 March 2027 | 100 days |
+| 15 March 2029 | **47 days** |
+
+Renewing by hand every six weeks is not a plan. **Renewal must be automated.**
+
+::: notes
+CA/Browser Forum ballot SC-081v3 (April 2025). The reasoning: a leaked key or
+a wrong certificate is a problem for a much shorter time, and revocation
+doesn't work well (next slide but one). Private CAs aren't bound by this, but
+the same logic applies.
+:::
+
+## Automate: ACME
+
+- **ACME** (RFC 8555) is the protocol for automatic certificates: prove you
+  control the domain, get a certificate, renew it on time, without human help
+- Tools: `certbot`, `acme.sh`, Caddy, Kubernetes `cert-manager`, and built into most cloud load balancers and CDNs
+- The key pair is generated **where it's used**, so the golden rule holds automatically
+
+**Question to ask any supplier:** *"Is certificate renewal automated? Who gets the alert when it fails?"*
+
+## Monitor what you can't automate
+
+```bash
+openssl x509 -in shop.crt -noout -enddate
+openssl x509 -in shop.crt -noout -checkend 2592000 && echo "OK for 30 more days"
+```
+
+- Monitor the **live** endpoint, not a file somewhere: that's what clients see
+- Alert **weeks** ahead, and send the alert to a **team**, not a person on holiday
+- Keep an inventory: which certificates, where, who owns them, how they renew
+
+::: notes
+2592000 seconds = 30 days. Builders use -checkend in exercise 5. Many outages
+are "the certificate expired and the one person who knew left the company".
+:::
+
+## Revocation, and why short lifetimes win
+
+- A CA can **revoke** a certificate (key stolen, issued in error)
+- Clients should check (CRL, OCSP), but in practice many **don't**, or give up when the check fails
+- Public CAs are moving away from OCSP; short lifetimes do the heavy lifting
+
+**If a private key leaks:** revoke **and** replace the key pair **and** find out how it leaked.
+
+## Pinning: extra lock, extra risk
+
+- **Pinning** = "only accept *this exact* certificate or key", on top of the normal checks
+- Common in mobile apps and partner integrations
+- Every renewal then **breaks** the pinned client, unless you planned for it
+
+**If you must pin:** pin the CA (or the key, not the certificate), keep a backup pin, and agree on a rotation plan with the partner.
+
+## Same certificate, different wrappers
+
+| Software | Wants |
+|----------|-------|
+| nginx, Apache, HAProxy, most Linux tools | **PEM**: `fullchain.pem` + `privkey.pem` (HAProxy: both in one file) |
+| Windows, IIS, Azure | **PKCS#12**: `.pfx` / `.p12` with password |
+| Java | keystore: **PKCS#12** or legacy **JKS** |
+
+Converting is fine, **on the owner's own machine**. The private key still stays home.
+
+```shell
+openssl pkcs12 -export -in shop.crt -inkey shop.key \
+    -certfile intermediate.crt -out shop.p12
+```
+
+## Red flags 🚩
+
+- `curl -k`, `--insecure`, `verify=False`, `NODE_TLS_REJECT_UNAUTHORIZED=0`
+- *"It works in the browser, so the certificate is fine"*
+- *"We pinned your certificate"*, with no rotation plan
+- *"Nobody knows who renews that certificate"*
+- *"Just buy a client certificate from a public CA"* (not since June 2026)
+
+## Recap {.smaller}
+
+1. **HTTPS = HTTP inside TLS.** The handshake agrees a secret, then the server proves who it is
+2. The client checks **chain, name, dates, usage, and proof of the private key**
+3. The padlock means **private line to this name**, not "trustworthy company"
+4. Most tickets are a **missing intermediate**, a **wrong name** or an **expired** certificate
+5. **mTLS**: the client generates its own key, the server trusts a CA **and** checks the name
+6. **47-day certificates** are coming: automate renewal, monitor the live endpoint
+
+## Exercises: pick your track (≈ 16 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Explainers
+
+No terminal needed. In pairs:
+
+**Scenario cards: HTTPS in real life**
+
+`exercises/tabletop-https-in-real-life.md`
+:::
+::: {.column width="50%"}
+### 🛠 Builders
+
+In the sandbox:
+
+1. HTTPS in the wild *(needs internet)*
+2. Build a chain of trust
+3. Your own HTTPS server, broken three ways
+4. Mutual TLS
+5. *Bonus: expiry and formats*
+:::
+::::
+
+## Error decoder
+
+| You see | It means | Who fixes it |
+|---------|----------|--------------|
+| `unable to get local issuer certificate`, `PKIX path building failed` | missing intermediate, or a private CA the client doesn't know | server (full chain) or client (add root) |
+| `no alternative certificate subject name matches` | name not in the SAN list | server: new certificate |
+| `certificate has expired` | expired | certificate owner |
+| `alert certificate required` | mTLS: the client sent no certificate | client |
+| `alert unknown ca` | mTLS: client certificate from a CA the server doesn't trust | agree on the CA |
+
+## Debrief {.center}
+
+The error decoder above, and one scenario card, everyone together.
+
+Questions? 🙋
+
+::: notes
+Go through the decoder: for each line ask "us or them?". Then card 4 (mTLS
+onboarding) presented by an explainer pair, with the builders adding which
+commands they'd run.
+:::

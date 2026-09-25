@@ -8,7 +8,7 @@
 | **Doelgroep** | Iedereen die op het werk te maken heeft met "certificaten", "keys" of "SSL", of je het nu zelf inricht of aan een klant moet uitleggen |
 | **Tracks** | 🗣 **Uitleggers**: geen terminal, scenariokaarten · 🛠 **Bouwers**: terminal-opdrachten in de sandbox |
 | **Voorbereiding** | Uitleggers: niets, neem een pen mee. Bouwers: de sandbox staat open en `tools/ready.sh` is helemaal groen (zie [Meedoen aan een cursus](../../joining.nl.md)). |
-| **Vervolg** | [02 · TLS & PKI in de praktijk](../02-tls-and-pki/README.md) |
+| **Vervolg** | [02 · TLS & PKI in de praktijk](../02-tls-and-pki/README.nl.md) |
 
 ## Na deze sessie kun je…
 
