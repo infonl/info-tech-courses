@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-cryptography \
         xxd file bsdextrautils \
         openssh-client netcat-openbsd iproute2 iputils-ping bind9-dnsutils tcpdump \
-        bash-completion less nano git make jq \
+        procps bash-completion less nano git make jq \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash student \

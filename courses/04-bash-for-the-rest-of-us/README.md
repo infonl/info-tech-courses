@@ -1,4 +1,4 @@
-# 03 · Bash for the rest of us *(planned)*
+# 04 · Bash for the rest of us *(optional, future course)*
 
 ## Outline
 

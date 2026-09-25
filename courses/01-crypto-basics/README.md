@@ -8,7 +8,7 @@
 | **Audience** | Everyone who deals with "certificates", "keys" or "SSL" at work, whether you configure it or need to explain it to a client |
 | **Tracks** | 🗣 **Explainers**: no terminal, scenario cards · 🛠 **Builders**: terminal exercises in the sandbox |
 | **Prerequisites** | Explainers: nothing, bring a pen. Builders: the sandbox open and `tools/ready.sh` all green (see [Joining a course](../../joining.md)). |
-| **Follow-up** | [02 · TLS & PKI in practice](../02-tls-and-pki/README.md) |
+| **Follow-up** | [02 · TLS & PKI in practice](../02-tls-and-pki/README.md), and [03 · Git](../03-git/README.md) reuses the fingerprint idea |
 
 ## After this session you can…
 

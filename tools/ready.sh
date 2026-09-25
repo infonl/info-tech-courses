@@ -22,7 +22,7 @@ else
     nok "Python 'cryptography' library not found" "use the sandbox, or: sudo apt install python3-cryptography"
 fi
 
-for tool in xxd file; do
+for tool in xxd file git curl; do
     if command -v "$tool" >/dev/null; then ok "$tool"; else nok "$tool not found" "use the sandbox, or: sudo apt install $tool"; fi
 done
 

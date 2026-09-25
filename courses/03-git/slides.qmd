@@ -1,0 +1,456 @@
+---
+title: "A time machine made of sticky notes"
+subtitle: "Git for everyone · Course 03"
+format:
+  revealjs:
+    theme: [default, ../../shared/theme.scss]
+    slide-number: true
+    hash-type: number
+    footer: "Info Tech Crash Courses · 03 · Git"
+    code-copy: true
+---
+
+## "I'll just force-push main to clean it up" {.center}
+
+> A developer in the team chat, Friday 16:45: *"The history on main is a mess.
+> I'll squash it all and force-push, so it looks nice."*
+
+. . .
+
+Good idea? What could go wrong, and for whom? What should they do instead?
+
+::: notes
+Let people react. Don't answer yet; Part 4 comes back to this message.
+:::
+
+## Today
+
+1. **Why git**: what came before, and why git won
+2. **Under the hood**: photos and sticky notes
+3. **Working together**: branches, merges, rebase, squash, cherry-pick, pull requests
+4. **The permanent record**: the golden rule, force-push, reflog, secrets
+5. **Exercises**:
+   - 🗣 **Explainers**: scenario cards
+   - 🛠 **Builders**: git in the sandbox
+
+## The one-slide version
+
+::: golden
+Git is a **photo album** of your project. Every photo points to the one
+before it. **Branches and tags are sticky notes** on photos.
+:::
+
+Almost everything in git is: take a photo, or move a sticky note.
+
+::: notes
+Keep coming back to this picture. Merge: a photo with two "previous" photos.
+Rebase: re-take photos on top of another one. Force-push: move someone else's
+sticky note.
+:::
+
+# Part 1 · Why git
+
+## Before version control
+
+```text
+offerte.docx
+offerte_v2.docx
+offerte_v2_JAN.docx
+offerte_v3_final.docx
+offerte_v3_final_REALLY_FINAL(2).docx
+```
+
+- **Which one is the latest?** Who changed what, and why?
+- Two people edit at the same time → **someone's work gets lost**
+- *"It worked yesterday"*: but what was yesterday's version?
+
+## Its ancestors
+
+| Year | Tool | The idea |
+|------|------|----------|
+| 1972 · 1982 | SCCS, RCS | history of **single files** |
+| 1990 | CVS | **whole projects**, on one central server |
+| 2000 | Subversion (SVN) | "CVS done right": atomic commits, still **central** |
+| 2002–2005 | BitKeeper | **distributed**, but proprietary. Used for the Linux kernel |
+| **April 2005** | **Git** (Linus Torvalds), Mercurial | BitKeeper's free licence is withdrawn. Git is self-hosting within days |
+| 2008 | GitHub | git gets **social**: forks and pull requests |
+
+::: notes
+Central systems: if the server is down, nobody can commit, and branching is
+expensive, so people avoid it. Distributed: every clone has the full history.
+Linus's design goals: fast, distributed, strong protection against
+corruption, and support for thousands of parallel branches (the kernel workflow).
+:::
+
+## Why git came out on top
+
+- **Distributed**: every copy has the **full history**: work offline, and every clone is a backup
+- **Cheap branches**: a branch is a sticky note, so branch-per-feature became normal
+- **Integrity**: everything is named by its fingerprint. Silent corruption or tampering shows
+- **Fast**: most operations never touch the network
+- **Network effects**: the Linux kernel as proof, then GitHub and GitLab made it the default
+
+Today **over 90%** of developers use git. Mercurial was just as good technically; GitHub decided it.
+
+::: notes
+Bitbucket dropped Mercurial support in 2020. The Stack Overflow developer
+survey has shown git at 90%+ for years. Git is also used well beyond code:
+documentation (like this course!), infrastructure config, legal texts.
+:::
+
+# Part 2 · Under the hood
+
+## A commit is a photo of everything
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  C2["📸 commit 093294f<br/>Say what we sell"] -- parent --> C1["📸 commit 5b2c200<br/>Add README"]
+  C2 --> T2["📁 tree"] --> B2["📄 README.md<br/>blob 91759b8"]
+  C1 --> T1["📁 tree"] --> B1["📄 README.md<br/>blob ce01362"]
+```
+
+- **Not** a list of changes: a **snapshot** of all files (unchanged files are simply reused)
+- Each commit records: the snapshot, the **parent**, who, when, and **why** (the message)
+
+::: notes
+blob = file content, tree = folder, commit = snapshot + metadata. Identical
+files are stored once, so snapshots are cheap. Builders see exactly these
+objects with git cat-file in exercise 1.
+:::
+
+## Everything is named by its fingerprint
+
+```bash
+echo "hello" | git hash-object --stdin
+```
+
+```text
+ce013625030ba8dba906f756967f9e9ca394464a
+```
+
+- Same content → **same name**, on every computer in the world
+- A commit contains its **parent's** fingerprint → change anything in the past,
+  and **every** fingerprint after it changes
+- History can't be changed **quietly**, only **replaced**
+
+::: notes
+The same idea as the chain of certificates in course 01, and a blockchain for
+that matter: each link contains the hash of the previous one. Git uses SHA-1
+(hardened against the known attacks) and supports SHA-256 repositories.
+:::
+
+## Branches and tags are sticky notes
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "Add README" tag: "v1.0"
+  commit id: "Say what we sell"
+  branch feature
+  checkout feature
+  commit id: "Add prices"
+  checkout main
+  commit id: "Welcome text"
+```
+
+- A **branch** = a file with one hash in it. It **moves** when you commit on it
+- A **tag** = the same, but it **stays put**: "this is version 1.0"
+- **HEAD** = *"you are here"*: the branch you're on
+
+::: notes
+`cat .git/refs/heads/main` shows a 41-byte file. That's why branches are cheap
+in git and expensive in older systems that copied folders.
+:::
+
+## Diffs are calculated, not stored
+
+- Git stores **snapshots**; a **diff** is computed by comparing two of them
+- So you can compare **any** two points: yesterday vs today, `main` vs a branch, v1.0 vs v2.0
+
+```diff
+ hello
+ We sell apples
++Welcome to the shop
+```
+
+- **Code review** is reading diffs: what exactly changes if we accept this?
+
+## Local and remote
+
+- **Your repository**: the full album, on your laptop
+- **A remote** (GitHub, GitLab, Azure DevOps…): a shared copy everyone syncs with
+- `push`: send my new photos and move the sticky note on the remote
+- `fetch` / `pull`: get the others' photos (pull = fetch + merge or rebase)
+
+**The remote is just another copy.** Everything git does locally, it does there too.
+
+# Part 3 · Working together
+
+## Branch and merge
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  branch feature
+  checkout feature
+  commit id: "C"
+  commit id: "D"
+  checkout main
+  commit id: "E"
+  merge feature id: "M"
+```
+
+- **Fast-forward**: `main` didn't move → just slide the sticky note forward
+- **Merge commit** (`M`): both moved → a new photo with **two parents**
+
+## Conflicts: git asks a human
+
+```text
+<<<<<<< HEAD
+Apples: 1.20 euro
+=======
+Apples: 80 cents
+>>>>>>> feature/cheaper
+```
+
+- Only when two branches changed **the same lines**
+- Git doesn't know who's right, and **neither version is "wrong"**
+- A person decides, edits the file, and finishes the merge
+
+::: notes
+Conflicts are a communication problem more than a technical one. Small,
+short-lived branches mean fewer and smaller conflicts.
+:::
+
+## Rebase: replay my work on top
+
+:::: {.columns}
+::: {.column width="50%"}
+**Before**
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  branch feature
+  checkout feature
+  commit id: "X"
+  commit id: "Y"
+  checkout main
+  commit id: "C"
+```
+:::
+::: {.column width="50%"}
+**After `git rebase main`**
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "B"
+  commit id: "C"
+  branch feature
+  checkout feature
+  commit id: "X'"
+  commit id: "Y'"
+```
+:::
+::::
+
+`X'` and `Y'` are **new copies** with **new fingerprints**. A clean, straight
+line, but history was **rewritten**.
+
+## Squash: many commits become one
+
+- *"wip"*, *"fix typo"*, *"oops"* → **one** commit: *"Add newsletter sign-up (#12)"*
+- On your own branch: `git rebase -i`; or on the platform: **Squash and merge**
+- **Gain:** a readable main history, one commit per change, easy to revert
+- **Lose:** the step-by-step detail (still visible in the pull request)
+
+## Cherry-pick: copy one fix
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A" tag: "v1.0"
+  branch release-1.0
+  checkout main
+  commit id: "new feature"
+  commit id: "hotfix"
+  checkout release-1.0
+  cherry-pick id: "hotfix"
+```
+
+- Take **one** commit and apply it somewhere else: the hotfix goes to the release, **without** the new features
+- The copy gets a **new fingerprint**; the change is the same
+
+## Pull requests / merge requests
+
+```{mermaid}
+%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+  B["🌿 branch<br/>+ commits"] --> P["📬 pull request"]
+  P --> R["👀 review<br/>💬 discussion"]
+  P --> T["🤖 CI: tests, checks"]
+  R & T --> M["✅ merge into main"] --> D["🚀 deploy"]
+```
+
+- *"Please look at my branch and merge it"*: a **platform** feature (GitHub: pull request, GitLab: merge request), not part of git
+- The place for **review**, **automatic checks** and the **why** behind a change
+
+::: notes
+Branch protection rules on the platform can require a PR, a number of
+approvals and green checks before anything reaches main, and forbid force-pushes.
+:::
+
+## Three ways to merge a pull request
+
+| Button | What `main` gets | 👍 | 👎 |
+|--------|------------------|----|----|
+| **Merge commit** | all commits + a merge commit | complete, true history | busy graph |
+| **Squash and merge** | **one** commit per PR | tidy, easy to revert | branch detail only in the PR |
+| **Rebase and merge** | the commits, replayed in a line | straight history, keeps commits | new hashes, every commit must be good |
+: {tbl-colwidths="[22,26,26,26]"}
+
+Pick **one** for the team, and write it down.
+
+## Branching strategies {.smaller}
+
+| Strategy | How | Fits |
+|----------|-----|------|
+| **Trunk-based** | tiny branches, merged to `main` daily; unfinished work behind feature flags | strong CI, continuous deployment |
+| **GitHub flow** | short-lived branch → pull request → `main` → deploy | most web apps and SaaS |
+| **Release branches** | `main` + `release/1.x` per supported version; fixes cherry-picked | products with several supported versions |
+| **GitFlow** | `develop`, `feature/*`, `release/*`, `hotfix/*` | versioned releases, big teams. Often more ceremony than needed |
+: {tbl-colwidths="[20,45,35]"}
+
+**Rule of thumb:** short-lived branches, merged often. Long-lived branches drift apart.
+
+# Part 4 · The permanent record
+
+## The golden rule of git {.center}
+
+::: golden
+**Never rewrite history that someone else may already have.**
+:::
+
+Your own, unshared branch: tidy it up as much as you like.
+A shared branch (`main`, `release/*`, a colleague's branch): **only add, never rewrite**.
+
+::: notes
+Rebase, squash, amend and reset all create new commits and move sticky notes
+backwards or sideways. Fine while you're the only one who has seen the old ones.
+:::
+
+## Force-push: moving someone else's sticky note
+
+- `git push --force` makes the remote label point wherever **you** say, and throws away what's not in your copy
+- Colleagues' commits **disappear** from the shared branch, and their next pull goes haywire
+- **Never** on `main`, release branches, or any branch others work on. **Protect** those branches on the platform
+- On **your own** branch after a rebase: `git push --force-with-lease`, which refuses if someone else pushed in the meantime
+
+::: notes
+Back to the opening message: squashing main and force-pushing breaks every
+colleague's clone and every open pull request, and destroys the audit trail.
+Builders do exactly this to "Bob" in exercise 5.
+:::
+
+## Fix forward: revert, don't erase
+
+```{mermaid}
+%%{init: {"themeVariables": {"git0": "#004449", "git1": "#64ff64", "git2": "#9bc4cb", "gitBranchLabel0": "#ffffff", "gitBranchLabel1": "#141414", "gitBranchLabel2": "#141414", "commitLabelColor": "#2e3335", "commitLabelBackground": "#ffffff", "commitLabelFontSize": "15px", "tagLabelColor": "#004449", "tagLabelBackground": "#d2fccb", "tagLabelBorder": "#004449", "tagLabelFontSize": "14px"}}}%%
+gitGraph
+  commit id: "A"
+  commit id: "bad change"
+  commit id: "B"
+  commit id: "Revert bad change" type: HIGHLIGHT
+```
+
+- `git revert` adds a **new** commit that undoes an old one
+- History tells the true story: **the mistake and the fix**
+- Nobody who already pulled gets into trouble. The audit trail stays intact
+
+## The reflog: git's diary
+
+- Every place `HEAD` and your branches have been, on **your** computer, for about **90 days**
+- *"I reset and lost everything!"* → `git reflog` → `git reset --hard HEAD@{1}`
+- A deleted branch? Git printed its hash when you deleted it
+- **Only committed work** is protected. Uncommitted changes can really be lost
+
+**Commit early, commit often**: then almost nothing is ever really lost.
+
+## Secrets in git: assume they're leaked
+
+- *"I removed the password in the next commit"*: it's still in **every older snapshot**
+- Everyone who cloned has it, and bots scan public repositories **within minutes**
+- **First:** revoke and **rotate** the secret. Then, if needed, clean up history (`git filter-repo`), with the whole team
+- **Prevent:** `.gitignore` for `.env` and keys, secret scanning on the platform, a secrets manager
+
+::: notes
+Rewriting history to remove a secret is clean-up, not a fix: forks, clones,
+CI caches and backups keep the old commits. The rotation is what actually
+makes the leaked secret worthless.
+:::
+
+## Who changed this, and why?
+
+- `git log`, `git blame`: every line leads to a commit, an author and a **message**
+- The pull request holds the **discussion**, the review and the ticket link
+- That's your **audit trail**, and it only works if you keep it:
+  - good commit messages: *why*, not just *what*
+  - no rewriting of shared history
+  - ticket numbers in PR titles or commits
+
+## Red flags 🚩
+
+- *"I'll just force-push main"*
+- *"Let's squash all of history into one commit"*
+- *"I removed the password in the next commit, so it's fine"*
+- A feature branch that has been open for **three months**
+- *"We don't need reviews, we're all seniors"*
+- `.env`, `*.key` or `*.pfx` files in the repository
+
+## Recap {.smaller}
+
+1. Git is a **photo album**: snapshots named by their **fingerprint**, each pointing to its parent
+2. **Branches, tags and HEAD are sticky notes**: tiny labels, cheap to make
+3. **Merge** ties work together; **rebase**, **squash** and **cherry-pick** make **copies** with new fingerprints
+4. **Pull requests** are where review, checks and the *why* live
+5. **Never rewrite history someone else may already have**: no force-push on shared branches, **fix forward** with revert
+6. The **reflog** saves committed work; a committed **secret** must be **rotated**
+
+## Exercises: pick your track (≈ 16 min)
+
+:::: {.columns}
+::: {.column width="50%"}
+### 🗣 Explainers
+
+No terminal needed. In pairs:
+
+**Scenario cards: git in a team**
+
+`exercises/tabletop-git-in-a-team.md`
+:::
+::: {.column width="50%"}
+### 🛠 Builders
+
+In the sandbox, one repository throughout:
+
+1. Under the hood
+2. Branches and merges
+3. Rebase, squash, cherry-pick
+4. Oops: reflog and revert
+5. *Bonus: force-push, for real*
+:::
+::::
+
+## Debrief {.center}
+
+One scenario card, everyone together. And: what would you reply to Friday's
+*"I'll just force-push main"*?
+
+Questions? 🙋

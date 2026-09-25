@@ -26,6 +26,21 @@ actually meet at work.
 | trust | vertrouwen |
 | padlock / wax seal / notary / passport | hangslot / lakzegel / notaris / paspoort |
 
+## Git: translate the metaphors, keep the commands
+
+| English | Nederlands |
+|---------|------------|
+| photo album / photo | fotoalbum / foto |
+| sticky note | plakbriefje |
+| "you are here" (HEAD) | "je bent hier" |
+| fix forward | vooruit repareren (fix forward) |
+| the golden rule | de gouden regel |
+
+Keep in English: commit, branch, merge, rebase, squash, cherry-pick, tag, HEAD,
+reflog, revert, reset, push, pull, fetch, clone, repository, pull request,
+merge request, force-push, fast-forward, diff, blame, remote, feature flag.
+Dutch verbs are fine where people use them: committen, mergen, pushen.
+
 ## Keep in English
 
 These appear in tools, file names, configs, tickets and vendor documentation.

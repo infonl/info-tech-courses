@@ -9,8 +9,9 @@ handout and hands-on exercises. Most courses come in English and Dutch.
 | # | Course | Status | EN | NL |
 |---|--------|--------|----|----|
 | 01 | **Crypto basics: locks, keys, seals & passports** | 🟢 draft | [README](courses/01-crypto-basics/README.md) · [slides](courses/01-crypto-basics/slides.qmd) | [README](courses/01-crypto-basics/README.nl.md) · [slides](courses/01-crypto-basics/slides.nl.qmd) |
-| 02 | TLS & PKI in practice: handshakes, chains, mTLS | ⚪ planned | [outline](courses/02-tls-and-pki/README.md) | |
-| 03 | Bash for the rest of us | ⚪ planned | [outline](courses/03-bash-for-the-rest-of-us/README.md) | |
+| 02 | **TLS & PKI in practice: HTTPS and beyond** | 🟢 draft | [README](courses/02-tls-and-pki/README.md) · [slides](courses/02-tls-and-pki/slides.qmd) | [README](courses/02-tls-and-pki/README.nl.md) · [slides](courses/02-tls-and-pki/slides.nl.qmd) |
+| 03 | **Git: a time machine made of sticky notes** | 🟢 draft | [README](courses/03-git/README.md) · [slides](courses/03-git/slides.qmd) | [README](courses/03-git/README.nl.md) · [slides](courses/03-git/slides.nl.qmd) |
+| 04 | Bash for the rest of us | ⚪ optional, future | [outline](courses/04-bash-for-the-rest-of-us/README.md) | |
 
 The rendered slides and pages are published to GitHub Pages (see
 [Publishing](#publishing)).
@@ -60,6 +61,13 @@ to the slide's front matter, or run
 ├── tools/                     exercise smoke tests, translation checks
 └── .github/workflows/         publish to Pages, test exercises
 ```
+
+## Look and feel
+
+Slides and pages follow the [info.nl](https://www.info.nl/) look: Outfit and
+Playfair Display, deep teal and mint, → bullets and the green wave. It's all
+in [shared/_brand.scss](shared/_brand.scss); see
+[CONTRIBUTING.md](CONTRIBUTING.md#look-and-feel-info-brand).
 
 ## Languages
 

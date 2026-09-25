@@ -14,7 +14,8 @@ what to bring, and how to get the exercise sandbox ready in 10 minutes.
 | # | Course | 🇬🇧 English | 🇳🇱 Nederlands |
 |---|--------|------------|---------------|
 | 01 | **Crypto basics**: locks, keys, seals & passports | [Slides](courses/01-crypto-basics/slides.qmd) · [Course](courses/01-crypto-basics/index.qmd) · [Handout](courses/01-crypto-basics/handout.md) | [Slides](courses/01-crypto-basics/slides.nl.qmd) · [Cursus](courses/01-crypto-basics/README.nl.md) · [Hand-out](courses/01-crypto-basics/handout.nl.md) |
-| 02 | TLS & PKI in practice *(planned)* | [Outline](courses/02-tls-and-pki/index.qmd) | |
-| 03 | Bash for the rest of us *(planned)* | [Outline](courses/03-bash-for-the-rest-of-us/index.qmd) | |
+| 02 | **TLS & PKI in practice**: HTTPS and beyond | [Slides](courses/02-tls-and-pki/slides.qmd) · [Course](courses/02-tls-and-pki/index.qmd) · [Handout](courses/02-tls-and-pki/handout.md) | [Slides](courses/02-tls-and-pki/slides.nl.qmd) · [Cursus](courses/02-tls-and-pki/README.nl.md) · [Hand-out](courses/02-tls-and-pki/handout.nl.md) |
+| 03 | **Git**: a time machine made of sticky notes | [Slides](courses/03-git/slides.qmd) · [Course](courses/03-git/index.qmd) · [Handout](courses/03-git/handout.md) | [Slides](courses/03-git/slides.nl.qmd) · [Cursus](courses/03-git/README.nl.md) · [Hand-out](courses/03-git/handout.nl.md) |
+| 04 | Bash for the rest of us *(optional, future course)* | [Outline](courses/04-bash-for-the-rest-of-us/index.qmd) | |
 
 The source for everything is on GitHub.

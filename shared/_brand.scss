@@ -1,0 +1,22 @@
+// INFO brand tokens, taken from www.info.nl (September 2026).
+// Used by both theme.scss (slides) and website.scss (web pages).
+// Fonts: Outfit and Playfair Display are free (SIL Open Font License) on Google Fonts.
+
+$brand-ink:        #141414;   // body text
+$brand-charcoal:   #2e3335;   // headings, buttons
+$brand-teal:       #004449;   // primary: panels, kicker lines, links
+$brand-mint:       #d2fccb;   // text and accents on teal
+$brand-pale-teal:  #ceeae8;   // light panels, table headers
+$brand-green:      #64ff64;   // accent only: circles, wavy lines. Never for text
+$brand-lilac:      #ebc9f8;   // secondary accent
+$brand-grey-bg:    #f5f5f5;
+$brand-grey-line:  #d6d6d6;
+
+$brand-font-sans:  "Outfit", "Helvetica Neue", Arial, sans-serif;
+$brand-font-serif: "Playfair Display", Georgia, serif;
+$brand-font-mono:  "JetBrains Mono", Consolas, monospace;
+
+$brand-fonts-url: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@400;600&family=JetBrains+Mono&display=swap";
+
+// The hand-drawn green wave used on title and section slides
+$brand-wave: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 40'><path d='M4 30 C 90 12, 150 38, 240 22 S 400 6, 470 20 S 560 30, 596 10' fill='none' stroke='%2364ff64' stroke-width='6' stroke-linecap='round'/></svg>";

@@ -18,3 +18,8 @@ that part is often the most useful lesson.
 | CSR | The **passport application form** | The form includes your public key, and you sign it with your private key to prove you have it. |
 | Private key leaked | Someone **copied your house key and your wax seal** | Revoking a certificate is like reporting a passport stolen: not every border guard checks the list. |
 | Man in the middle | Someone **swaps the padlock** in the post | — |
+| Git commit | A **photo** of the whole project, with a note on the back pointing to the previous photo | Git doesn't store duplicate files twice; the "photo" reuses unchanged files |
+| Git branch, tag | A **sticky note** on a photo (a branch moves along as you add photos, a tag stays put) | — |
+| Git HEAD | The **"you are here"** arrow | — |
+| Rebase, cherry-pick | **Re-taking** photos on top of another one: copies, not the originals | The originals still exist for a while (the reflog), which the metaphor doesn't show |
+| Force-push | **Moving someone else's sticky note**, so their photos are no longer in the album | — |
